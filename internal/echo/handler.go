@@ -23,8 +23,8 @@ type Handler struct {
 }
 
 func NewHandler(maxBodyBytes int64) (*Handler, error) {
-	if maxBodyBytes < 0 {
-		return nil, fmt.Errorf("maxBodyBytes must not be negative")
+	if maxBodyBytes < 1 {
+		return nil, fmt.Errorf("max body bytes must be a positive integer")
 	}
 	return &Handler{maxBodyBytes}, nil
 }
