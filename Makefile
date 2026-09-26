@@ -1,0 +1,6 @@
+fmt:
+	gofmt -w cmd internal
+	go vet ./...
+
+test:
+	go test -race -cover -v ./...
