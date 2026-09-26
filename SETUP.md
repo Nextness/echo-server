@@ -8,38 +8,38 @@ Run commands from the repository root unless a section says otherwise.
 
 Install these tools before starting:
 
-- [Go](https://go.dev/doc/install)
-- [Docker Engine](https://docs.docker.com/engine/install/)
-- [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- [Pulumi CLI](https://www.pulumi.com/docs/iac/download-install/)
+- Go
+- Docker Engine
+- Docker Buildx plugin
+- Kind
+- kubectl
+- Pulumi CLI
 - GNU Make, Git, Bash, curl, and jq
-- `gh` only if configuring the GitHub Actions secret from the command line
 
 **Note**: The shell script uses Bash features such as arrays and `mapfile`. On Windows, use WSL2 rather than attempting to run it from Command Prompt or PowerShell.
 
 ### Tested versions
 
-The following table lists the versions used to run the complete project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`. This command checks Bash, GNU Make, Go, the Docker CLI and daemon, Kind, kubectl, Pulumi, Git, curl, and jq. It prints every missing, outdated, or unusable requirement and exits with a non-zero status if any check fails. Installed command-line tool versions may be equal to or newer than the corresponding versions in the table below.
+The following table lists the versions used to run the complete project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`. This command checks Bash, GNU Make, Go, the Docker CLI, Buildx and daemon, Kind, kubectl, Pulumi, Git, curl, and jq. It prints every missing, outdated, or unusable requirement and exits with a non-zero status if any check fails. Installed command-line tool versions may be equal to or newer than the corresponding versions in the table below.
 
 If you don't have `make` installed in your system, you can use bash directly with the following command `bash scripts/check-requirements.sh`.
 
-| Component                      | Version                            |
-| ------------------------------ | ---------------------------------- |
-| Bash                           | `5.3.15`                           |
-| GNU Make                       | `4.4.1`                            |
-| Go                             | `1.26.6`                           |
-| Docker Engine                  | `29.8.1`                           |
-| Kind                           | `v0.33.0`                          |
-| Kubernetes node                | `v1.37.0`                          |
-| kubectl                        | `v1.37.0`                          |
-| Pulumi CLI                     | `3.264.0` minimum; `3.265.0` in CI |
-| Pulumi Go SDK                  | `v3.265.0`                         |
-| Pulumi Kubernetes SDK/provider | `v4.34.2`                          |
-| Git                            | `2.55.0`                           |
-| curl                           | `8.21.0`                           |
-| jq                             | `1.8.2`                            |
-| Kind GitHub Action             | `v1.15.0`                          |
+| Component                      | Version    |
+| ------------------------------ | ---------- |
+| Bash                           | `5.3.15`   |
+| GNU Make                       | `4.4.1`    |
+| Go                             | `1.26.6`   |
+| Docker Engine                  | `29.8.1`   |
+| Docker Buildx                  | `v0.37.1`  |
+| Kind                           | `v0.33.0`  |
+| Kubernetes node                | `v1.37.0`  |
+| kubectl                        | `v1.37.0`  |
+| Pulumi CLI                     | `3.264.0`  |
+| Pulumi Go SDK                  | `v3.265.0` |
+| Pulumi Kubernetes SDK/provider | `v4.34.2`  |
+| Git                            | `2.55.0`   |
+| curl                           | `8.21.0`   |
+| jq                             | `1.8.2`    |
 
 **Note**: The Kubernetes node image is pinned to: `kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5`
 
@@ -97,7 +97,7 @@ The wait command may return immediately when the node is already ready as it wai
 Using the `Dockerfile` provided in the project, we need to create the image we will use for the application to run in the cluster:
 
 ```bash
-docker build --tag echo-server:local .
+docker buildx build --load --tag echo-server:local .
 ```
 
 Verify the image in the host Docker daemon:
@@ -279,7 +279,7 @@ Rebuilding the same `echo-server:local` tag does not change the Deployment speci
 
 ```bash
 image_ref="echo-server:dev-$(date +%s)"
-docker build --tag "${image_ref}" .
+docker buildx build --load --tag "${image_ref}" .
 kind load docker-image "${image_ref}" --name echo
 pulumi -C infra config set image "${image_ref}" --stack local
 pulumi -C infra up --yes --stack local
@@ -319,16 +319,16 @@ The Service must also be changed to `NodePort` with the matching port:
 
 ```go
 Spec: corev1.ServiceSpecArgs{
-	Type:     pulumi.String("NodePort"),
-	Selector: labels,
-	Ports: corev1.ServicePortArray{
-		corev1.ServicePortArgs{
-			Name:       pulumi.String("http"),
-			Port:       pulumi.Int(80),
-			TargetPort: pulumi.String("http"),
-			NodePort:   pulumi.Int(30080),
-		},
-	},
+    Type: pulumi.String("NodePort"),
+    Selector: labels,
+    Ports: corev1.ServicePortArray{
+        corev1.ServicePortArgs{
+            Name:       pulumi.String("http"),
+            Port:       pulumi.Int(80),
+            TargetPort: pulumi.String("http"),
+            NodePort:   pulumi.Int(30080),
+        },
+    },
 },
 ```
 
@@ -559,4 +559,3 @@ Remove the project environment with:
 ```bash
 make test-e2e E2E_ARGS=--delete
 ```
-

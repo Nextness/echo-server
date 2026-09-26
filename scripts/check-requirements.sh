@@ -4,6 +4,7 @@ readonly MIN_BASH_VERSION="5.3.15"
 readonly MIN_MAKE_VERSION="4.4.1"
 readonly MIN_GO_VERSION="1.26.6"
 readonly MIN_DOCKER_VERSION="29.8.1"
+readonly MIN_DOCKER_BUILDX_VERSION="0.37.1"
 readonly MIN_KIND_VERSION="0.33.0"
 readonly MIN_KUBECTL_VERSION="1.37.0"
 readonly MIN_PULUMI_VERSION="3.264.0"
@@ -129,6 +130,7 @@ check_version "Bash" "bash" "${MIN_BASH_VERSION}" --version
 check_version "GNU Make" "make" "${MIN_MAKE_VERSION}" --version
 check_version "Go" "go" "${MIN_GO_VERSION}" version
 check_version "Docker CLI" "docker" "${MIN_DOCKER_VERSION}" --version
+check_version "Docker Buildx" "docker" "${MIN_DOCKER_BUILDX_VERSION}" buildx version
 check_docker_daemon
 check_version "Kind" "kind" "${MIN_KIND_VERSION}" version
 check_version "kubectl" "kubectl" "${MIN_KUBECTL_VERSION}" version --client

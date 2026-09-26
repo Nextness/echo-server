@@ -162,7 +162,7 @@ function create_and_test_environment() {
     --timeout=120s
   kubectl --context "${kube_context}" get nodes -o wide
 
-  docker build --tag "${image_ref}" "${repository_root}"
+  docker buildx build --load --tag "${image_ref}" "${repository_root}"
   docker image inspect "${image_ref}" >/dev/null
   kind load docker-image "${image_ref}" --name "${cluster_name}"
   docker exec "${cluster_name}-control-plane" crictl images | grep -F "echo-server"
