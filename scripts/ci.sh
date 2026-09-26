@@ -17,13 +17,6 @@ do
     fi
 done
 
-if ! kind get clusters | grep -Fxq "${KIND_CLUSTER_NAME}";
-then
-  echo "Kind cluster ${KIND_CLUSTER_NAME} does not exist" >&2
-  echo "Failed to create kind cluster ${KIND_CLUSTER_NAME}" >&2
-  exit 1
-fi
-
 mapfile -t go_files < <(git -C "${repository_root}" ls-files '*.go')
 unformatted="$(cd "${repository_root}" && gofmt -l "${go_files[@]}")"
 if [[ -n "${unformatted}" ]];
@@ -42,8 +35,15 @@ fi
 (
   cd "${repository_root}/infra"
   go vet ./...
-  go test ./...
+  go test -race -cover ./...
 )
+
+if ! kind get clusters | grep -Fxq "${KIND_CLUSTER_NAME}";
+then
+  echo "Kind cluster ${KIND_CLUSTER_NAME} does not exist" >&2
+  echo "Create it before running this script." >&2
+  exit 1
+fi
 
 docker buildx build --pull --load --tag "${IMAGE_REF}" "${repository_root}"
 kind load docker-image "${IMAGE_REF}" --name "${KIND_CLUSTER_NAME}"
