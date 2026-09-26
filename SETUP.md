@@ -516,7 +516,8 @@ mapfile -t project_image_refs < <(
     --format '{{.Repository}}:{{.Tag}}'
 )
 
-if (( ${#project_image_refs[@]} > 0 )); then
+if (( ${#project_image_refs[@]} > 0 ));
+then
   docker image rm "${project_image_refs[@]}"
 fi
 ```
