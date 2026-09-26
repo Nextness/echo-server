@@ -17,12 +17,10 @@ do
     fi
 done
 
-# TODO: The error messages should not be like this, they should be different since they are
-# pipeline related.
 if ! kind get clusters | grep -Fxq "${KIND_CLUSTER_NAME}";
 then
   echo "Kind cluster ${KIND_CLUSTER_NAME} does not exist" >&2
-  echo "Create it with: kind create cluster --name ${KIND_CLUSTER_NAME}" >&2
+  echo "Failed to create kind cluster ${KIND_CLUSTER_NAME}" >&2
   exit 1
 fi
 
