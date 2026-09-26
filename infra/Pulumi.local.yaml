@@ -2,4 +2,4 @@ config:
   kubernetes:context: kind-echo
   echo-infra:image: echo-server:local
   echo-infra:replicas: "1"
-encryptionsalt: v1:b84ja6f8Mqs=:v1:tuhClPF78+RfNXbz:0prPJKVbqBiIu47BwtqZNZuO/JJELQ==
+encryptionsalt: v1:oJATCsaXqjI=:v1:c725gVTB30OquHcI:8F0r2st0HhNYsadxQGrg8ZPmwaOI2g==
