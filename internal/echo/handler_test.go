@@ -235,6 +235,23 @@ func TestHandlerServesConcurrentRequests(t *testing.T) {
 	}
 }
 
+func TestNewHandlerRejectsInvalidBodyLimits(t *testing.T) {
+	tests := []int64{0, -1}
+
+	for _, value := range tests {
+		t.Run(fmt.Sprintf("%d", value), func(t *testing.T) {
+			_, err := NewHandler(value)
+			if err == nil {
+				t.Fatalf("Got NewHandler(%d) error = nil, but expected an error", value)
+			}
+			expectedErrorSubstring := "positive integer"
+			if !strings.Contains(err.Error(), expectedErrorSubstring) {
+				t.Errorf("Got error = %q, but expected it to contain %q", err, expectedErrorSubstring)
+			}
+		})
+	}
+}
+
 func decodeResponse(t *testing.T, recorder *httptest.ResponseRecorder) Response {
 	t.Helper()
 
