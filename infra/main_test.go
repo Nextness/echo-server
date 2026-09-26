@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"reflect"
+	"maps"
 	"strings"
 	"sync"
 	"testing"
@@ -56,6 +56,12 @@ func TestRunRegistersDeploymentAndServiceContract(t *testing.T) {
 	}
 
 	deployment := mocks.resourceByType(t, deploymentType)
+	expectedLabels := map[string]any{"app.kubernetes.io/name": "echo-server"}
+	deploymentMetadata := mapValue(t, deployment.Inputs.Mappable(), "metadata")
+	if got := mapValue(t, deploymentMetadata, "labels"); !maps.Equal(got, expectedLabels) {
+		t.Errorf("Got Deployment labels = %#v, but expected %#v", got, expectedLabels)
+	}
+
 	deploymentSpec := mapValue(t, deployment.Inputs.Mappable(), "spec")
 	expectedReplicas := float64(3)
 	if got := deploymentSpec["replicas"]; got != expectedReplicas {
@@ -64,6 +70,32 @@ func TestRunRegistersDeploymentAndServiceContract(t *testing.T) {
 
 	selector := mapValue(t, deploymentSpec, "selector")
 	deploymentLabels := mapValue(t, selector, "matchLabels")
+	if !maps.Equal(deploymentLabels, expectedLabels) {
+		t.Errorf("Got Deployment selector matchLabels = %#v, but expected %#v", deploymentLabels, expectedLabels)
+	}
+
+	template := mapValue(t, deploymentSpec, "template")
+	templateMetadata := mapValue(t, template, "metadata")
+	if got := mapValue(t, templateMetadata, "labels"); !maps.Equal(got, expectedLabels) {
+		t.Errorf("Got Pod template labels = %#v, but expected %#v", got, expectedLabels)
+	}
+
+	podSpec := mapValue(t, template, "spec")
+	expectedAutomountServiceAccountToken := false
+	if got := podSpec["automountServiceAccountToken"]; got != expectedAutomountServiceAccountToken {
+		t.Errorf("Got automountServiceAccountToken = %#v, but expected %#v", got, expectedAutomountServiceAccountToken)
+	}
+	expectedTerminationGracePeriodSeconds := float64(15)
+	if got := podSpec["terminationGracePeriodSeconds"]; got != expectedTerminationGracePeriodSeconds {
+		t.Errorf("Got terminationGracePeriodSeconds = %#v, but expected %#v", got, expectedTerminationGracePeriodSeconds)
+	}
+	podSecurityContext := mapValue(t, podSpec, "securityContext")
+	seccompProfile := mapValue(t, podSecurityContext, "seccompProfile")
+	expectedSeccompProfileType := "RuntimeDefault"
+	if got := seccompProfile["type"]; got != expectedSeccompProfileType {
+		t.Errorf("Got seccompProfile type = %#v, but expected %q", got, expectedSeccompProfileType)
+	}
+
 	container := deploymentContainer(t, deploymentSpec)
 	expectedImage := "echo-server:test"
 	if got := container["image"]; got != expectedImage {
@@ -85,6 +117,16 @@ func TestRunRegistersDeploymentAndServiceContract(t *testing.T) {
 		t.Errorf("Got container port = %#v, but expected %#v", got, expectedContainerPort)
 	}
 
+	envVar := objectValue(t, sliceValue(t, container, "env")[0], "environment variable")
+	expectedEnvName := "PORT"
+	if got := envVar["name"]; got != expectedEnvName {
+		t.Errorf("Got env name = %#v, but expected %q", got, expectedEnvName)
+	}
+	expectedEnvValue := "8080"
+	if got := envVar["value"]; got != expectedEnvValue {
+		t.Errorf("Got env value = %#v, but expected %q", got, expectedEnvValue)
+	}
+
 	expectedReadinessPath := "/readyz"
 	assertProbe(t, container, "readinessProbe", expectedReadinessPath)
 	expectedLivenessPath := "/healthz"
@@ -103,6 +145,23 @@ func TestRunRegistersDeploymentAndServiceContract(t *testing.T) {
 		}
 	}
 
+	capabilities := mapValue(t, securityContext, "capabilities")
+	droppedCapabilities := sliceValue(t, capabilities, "drop")
+	expectedDroppedCapability := "ALL"
+	if got := droppedCapabilities[0]; got != expectedDroppedCapability {
+		t.Errorf("Got dropped capability = %#v, but expected %q", got, expectedDroppedCapability)
+	}
+
+	resources := mapValue(t, container, "resources")
+	expectedRequests := map[string]any{"cpu": "10m", "memory": "16Mi"}
+	if got := mapValue(t, resources, "requests"); !maps.Equal(got, expectedRequests) {
+		t.Errorf("Got resource requests = %#v, but expected %#v", got, expectedRequests)
+	}
+	expectedLimits := map[string]any{"cpu": "100m", "memory": "64Mi"}
+	if got := mapValue(t, resources, "limits"); !maps.Equal(got, expectedLimits) {
+		t.Errorf("Got resource limits = %#v, but expected %#v", got, expectedLimits)
+	}
+
 	service := mocks.resourceByType(t, serviceType)
 	serviceSpec := mapValue(t, service.Inputs.Mappable(), "spec")
 	expectedServiceType := "ClusterIP"
@@ -111,12 +170,16 @@ func TestRunRegistersDeploymentAndServiceContract(t *testing.T) {
 	}
 	serviceLabels := mapValue(t, serviceSpec, "selector")
 	expectedServiceLabels := deploymentLabels
-	if !reflect.DeepEqual(serviceLabels, expectedServiceLabels) {
+	if !maps.Equal(serviceLabels, expectedServiceLabels) {
 		t.Errorf("Got Service selector = %#v, but expected %#v", serviceLabels, expectedServiceLabels)
 	}
 
 	servicePorts := sliceValue(t, serviceSpec, "ports")
 	servicePort := objectValue(t, servicePorts[0], "service port")
+	expectedServicePortName := "http"
+	if got := servicePort["name"]; got != expectedServicePortName {
+		t.Errorf("Got Service port name = %#v, but expected %q", got, expectedServicePortName)
+	}
 	expectedServicePort := float64(80)
 	if got := servicePort["port"]; got != expectedServicePort {
 		t.Errorf("Got Service port = %#v, but expected %#v", got, expectedServicePort)

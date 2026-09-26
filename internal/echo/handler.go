@@ -1,3 +1,5 @@
+// Package echo provides an http.Handler that echoes request headers, query
+// parameters, raw body, and path as JSON.
 package echo
 
 import (
@@ -8,8 +10,11 @@ import (
 	"net/http"
 )
 
-const DefaultMaxBodyBytes int64 = 1 << 20 // 1 MiB sounds fine
+// DefaultMaxBodyBytes is the default maximum request-body size of 1 MiB.
+const DefaultMaxBodyBytes int64 = 1 << 20
 
+// Response is the JSON envelope returned for every request. Body is empty and
+// Error is set when the request body cannot be read.
 type Response struct {
 	Headers http.Header         `json:"headers"`
 	Params  map[string][]string `json:"params"`
@@ -18,25 +23,31 @@ type Response struct {
 	Error   string              `json:"error,omitempty"`
 }
 
+// Handler is a stateless http.Handler that echoes requests.
 type Handler struct {
 	maxBodyBytes int64
 }
 
+// NewHandler returns a Handler that limits request bodies to maxBodyBytes,
+// which must be positive.
 func NewHandler(maxBodyBytes int64) (*Handler, error) {
-	if maxBodyBytes < 0 {
-		return nil, fmt.Errorf("maxBodyBytes must not be negative")
+	if maxBodyBytes < 1 {
+		return nil, fmt.Errorf("max body bytes must be a positive integer")
 	}
 	return &Handler{maxBodyBytes}, nil
 }
 
-func (handler *Handler) ServeHTTP(writter http.ResponseWriter, request *http.Request) {
+// ServeHTTP writes the request headers, query parameters, raw body, and path
+// as JSON. It returns 413 when the body exceeds the configured limit and 400
+// when the body cannot be read.
+func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	headers := request.Header.Clone()
 
 	if request.Host != "" {
 		headers.Set("Host", request.Host)
 	}
 
-	body, err := io.ReadAll(http.MaxBytesReader(writter, request.Body, handler.maxBodyBytes))
+	body, err := io.ReadAll(http.MaxBytesReader(writer, request.Body, handler.maxBodyBytes))
 	response := Response{
 		Headers: headers,
 		Params:  request.URL.Query(),
@@ -57,9 +68,9 @@ func (handler *Handler) ServeHTTP(writter http.ResponseWriter, request *http.Req
 		response.Body = string(body)
 	}
 
-	writter.Header().Set("Content-Type", "application/json")
-	writter.Header().Set("X-Content-Type-Options", "nosniff")
-	writter.WriteHeader(status)
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Header().Set("X-Content-Type-Options", "nosniff")
+	writer.WriteHeader(status)
 
-	_ = json.NewEncoder(writter).Encode(response)
+	_ = json.NewEncoder(writer).Encode(response)
 }

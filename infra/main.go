@@ -24,7 +24,7 @@ func run(ctx *pulumi.Context) error {
 	}
 
 	ctx.Export("serviceName", service.Metadata.Name())
-	ctx.Export("portForward", pulumi.String("kubectl port-forward service/echo-server 8080:80"))
+	ctx.Export("portForward", pulumi.Sprintf("kubectl port-forward service/%s 8080:80", service.Metadata.Name()))
 	return nil
 }
 

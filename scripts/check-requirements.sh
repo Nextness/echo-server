@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 set -Eeuo pipefail
 
 readonly MIN_BASH_VERSION="5.3.15"

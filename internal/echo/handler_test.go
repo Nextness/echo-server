@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -50,15 +50,15 @@ func TestHandlerEchoesRequest(t *testing.T) {
 		t.Errorf("Got Body = %q, but expected %q", response.Body, expectedBody)
 	}
 	expectedTags := []string{"go", "kubernetes"}
-	if !reflect.DeepEqual(response.Params["tag"], expectedTags) {
+	if !slices.Equal(response.Params["tag"], expectedTags) {
 		t.Errorf("Got Tags = %#v, but expected %#v", response.Params["tag"], expectedTags)
 	}
 	expectedEmpty := []string{""}
-	if !reflect.DeepEqual(response.Params["empty"], expectedEmpty) {
+	if !slices.Equal(response.Params["empty"], expectedEmpty) {
 		t.Errorf("Got empty params = %#v, but expected %#v", response.Params["empty"], expectedEmpty)
 	}
 	expectedXDemo := []string{"one", "two"}
-	if !reflect.DeepEqual(response.Headers.Values("X-Demo"), expectedXDemo) {
+	if !slices.Equal(response.Headers.Values("X-Demo"), expectedXDemo) {
 		t.Errorf("Got X-Demo = %#v, but expected %#v", response.Headers.Values("X-Demo"), expectedXDemo)
 	}
 	expectedHost := "echo.test"
@@ -232,6 +232,23 @@ func TestHandlerServesConcurrentRequests(t *testing.T) {
 	close(errorsChannel)
 	for err := range errorsChannel {
 		t.Error(err)
+	}
+}
+
+func TestNewHandlerRejectsInvalidBodyLimits(t *testing.T) {
+	tests := []int64{0, -1}
+
+	for _, value := range tests {
+		t.Run(fmt.Sprintf("%d", value), func(t *testing.T) {
+			_, err := NewHandler(value)
+			if err == nil {
+				t.Fatalf("Got NewHandler(%d) error = nil, but expected an error", value)
+			}
+			expectedErrorSubstring := "positive integer"
+			if !strings.Contains(err.Error(), expectedErrorSubstring) {
+				t.Errorf("Got error = %q, but expected it to contain %q", err, expectedErrorSubstring)
+			}
+		})
 	}
 }
 

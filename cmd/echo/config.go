@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+
+	echoHandler "github.com/nextness/echo-server/internal/echo"
 )
 
-const (
-	defaultPort         = 8080
-	defaultMaxBodyBytes = int64(1 << 20)
-)
+const defaultPort = 8080
 
 type config struct {
 	Port         int
@@ -19,7 +18,7 @@ type config struct {
 func loadConfig() (config, error) {
 	cfg := config{
 		Port:         defaultPort,
-		MaxBodyBytes: defaultMaxBodyBytes,
+		MaxBodyBytes: echoHandler.DefaultMaxBodyBytes,
 	}
 
 	if envVar := os.Getenv("PORT"); envVar != "" {
