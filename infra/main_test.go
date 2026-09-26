@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"reflect"
+	"maps"
 	"strings"
 	"sync"
 	"testing"
@@ -58,7 +58,7 @@ func TestRunRegistersDeploymentAndServiceContract(t *testing.T) {
 	deployment := mocks.resourceByType(t, deploymentType)
 	expectedLabels := map[string]any{"app.kubernetes.io/name": "echo-server"}
 	deploymentMetadata := mapValue(t, deployment.Inputs.Mappable(), "metadata")
-	if got := mapValue(t, deploymentMetadata, "labels"); !reflect.DeepEqual(got, expectedLabels) {
+	if got := mapValue(t, deploymentMetadata, "labels"); !maps.Equal(got, expectedLabels) {
 		t.Errorf("Got Deployment labels = %#v, but expected %#v", got, expectedLabels)
 	}
 
@@ -70,13 +70,13 @@ func TestRunRegistersDeploymentAndServiceContract(t *testing.T) {
 
 	selector := mapValue(t, deploymentSpec, "selector")
 	deploymentLabels := mapValue(t, selector, "matchLabels")
-	if !reflect.DeepEqual(deploymentLabels, expectedLabels) {
+	if !maps.Equal(deploymentLabels, expectedLabels) {
 		t.Errorf("Got Deployment selector matchLabels = %#v, but expected %#v", deploymentLabels, expectedLabels)
 	}
 
 	template := mapValue(t, deploymentSpec, "template")
 	templateMetadata := mapValue(t, template, "metadata")
-	if got := mapValue(t, templateMetadata, "labels"); !reflect.DeepEqual(got, expectedLabels) {
+	if got := mapValue(t, templateMetadata, "labels"); !maps.Equal(got, expectedLabels) {
 		t.Errorf("Got Pod template labels = %#v, but expected %#v", got, expectedLabels)
 	}
 
@@ -154,11 +154,11 @@ func TestRunRegistersDeploymentAndServiceContract(t *testing.T) {
 
 	resources := mapValue(t, container, "resources")
 	expectedRequests := map[string]any{"cpu": "10m", "memory": "16Mi"}
-	if got := mapValue(t, resources, "requests"); !reflect.DeepEqual(got, expectedRequests) {
+	if got := mapValue(t, resources, "requests"); !maps.Equal(got, expectedRequests) {
 		t.Errorf("Got resource requests = %#v, but expected %#v", got, expectedRequests)
 	}
 	expectedLimits := map[string]any{"cpu": "100m", "memory": "64Mi"}
-	if got := mapValue(t, resources, "limits"); !reflect.DeepEqual(got, expectedLimits) {
+	if got := mapValue(t, resources, "limits"); !maps.Equal(got, expectedLimits) {
 		t.Errorf("Got resource limits = %#v, but expected %#v", got, expectedLimits)
 	}
 
@@ -170,7 +170,7 @@ func TestRunRegistersDeploymentAndServiceContract(t *testing.T) {
 	}
 	serviceLabels := mapValue(t, serviceSpec, "selector")
 	expectedServiceLabels := deploymentLabels
-	if !reflect.DeepEqual(serviceLabels, expectedServiceLabels) {
+	if !maps.Equal(serviceLabels, expectedServiceLabels) {
 		t.Errorf("Got Service selector = %#v, but expected %#v", serviceLabels, expectedServiceLabels)
 	}
 

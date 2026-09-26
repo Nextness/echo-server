@@ -1,11 +1,16 @@
 package main
 
 import (
+	"strconv"
+
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
+
+// containerPort is the port the Echo Server container listens on.
+const containerPort = 8080
 
 // AppArgs configures the Echo Server deployment.
 type AppArgs struct {
@@ -45,13 +50,13 @@ func deployEcho(ctx *pulumi.Context, args AppArgs) (*corev1.Service, error) {
 							Ports: corev1.ContainerPortArray{
 								corev1.ContainerPortArgs{
 									Name:          pulumi.String("http"),
-									ContainerPort: pulumi.Int(8080),
+									ContainerPort: pulumi.Int(containerPort),
 								},
 							},
 							Env: corev1.EnvVarArray{
 								corev1.EnvVarArgs{
 									Name:  pulumi.String("PORT"),
-									Value: pulumi.String("8080"),
+									Value: pulumi.String(strconv.Itoa(containerPort)),
 								},
 							},
 							ReadinessProbe: httpProbe("/readyz", 2, 5),

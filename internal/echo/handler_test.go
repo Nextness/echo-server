@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -50,15 +50,15 @@ func TestHandlerEchoesRequest(t *testing.T) {
 		t.Errorf("Got Body = %q, but expected %q", response.Body, expectedBody)
 	}
 	expectedTags := []string{"go", "kubernetes"}
-	if !reflect.DeepEqual(response.Params["tag"], expectedTags) {
+	if !slices.Equal(response.Params["tag"], expectedTags) {
 		t.Errorf("Got Tags = %#v, but expected %#v", response.Params["tag"], expectedTags)
 	}
 	expectedEmpty := []string{""}
-	if !reflect.DeepEqual(response.Params["empty"], expectedEmpty) {
+	if !slices.Equal(response.Params["empty"], expectedEmpty) {
 		t.Errorf("Got empty params = %#v, but expected %#v", response.Params["empty"], expectedEmpty)
 	}
 	expectedXDemo := []string{"one", "two"}
-	if !reflect.DeepEqual(response.Headers.Values("X-Demo"), expectedXDemo) {
+	if !slices.Equal(response.Headers.Values("X-Demo"), expectedXDemo) {
 		t.Errorf("Got X-Demo = %#v, but expected %#v", response.Headers.Values("X-Demo"), expectedXDemo)
 	}
 	expectedHost := "echo.test"
