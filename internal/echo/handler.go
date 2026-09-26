@@ -3,6 +3,7 @@ package echo
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 )
@@ -21,14 +22,13 @@ type Handler struct {
 	maxBodyBytes int64
 }
 
-func NewHandler(maxBodyBytes int64) *Handler {
-	return &Handler{maxBodyBytes}
+func NewHandler(maxBodyBytes int64) (*Handler, error) {
+	if maxBodyBytes < 0 {
+		return nil, fmt.Errorf("maxBodyBytes must not be negative")
+	}
+	return &Handler{maxBodyBytes}, nil
 }
 
-// TODO: Validate 'maxBodyBytes > 0' in configuration before constructing the handler
-// TODO: Decide whether an error response should return the partial body or an empty body
-// TODO: A 'HEAD' request should follow standard HTTP semantics: headers and status are returned, but the transport suppresses the response body
-// TODO: Consider a small `writeJSON` helper if error handling would otherwise be duplicated
 func (handler *Handler) ServeHTTP(writter http.ResponseWriter, request *http.Request) {
 	headers := request.Header.Clone()
 
@@ -36,19 +36,16 @@ func (handler *Handler) ServeHTTP(writter http.ResponseWriter, request *http.Req
 		headers.Set("Host", request.Host)
 	}
 
-	// TODO: Should we handle error immediately?
 	body, err := io.ReadAll(http.MaxBytesReader(writter, request.Body, handler.maxBodyBytes))
 	response := Response{
 		Headers: headers,
 		Params:  request.URL.Query(),
-		Body:    string(body),
 		Path:    request.URL.Path,
 	}
 
 	status := http.StatusOK
 	if err != nil {
 		var maxBytesError *http.MaxBytesError
-		// TODO: does it need to be a pointer to the pointer? Check later
 		if errors.As(err, &maxBytesError) {
 			status = http.StatusRequestEntityTooLarge
 			response.Error = "request body exceeds the configured limit"
@@ -56,10 +53,11 @@ func (handler *Handler) ServeHTTP(writter http.ResponseWriter, request *http.Req
 			status = http.StatusBadRequest
 			response.Error = "could not read request body"
 		}
+	} else {
+		response.Body = string(body)
 	}
 
 	writter.Header().Set("Content-Type", "application/json")
-	// TODO: Do we need nosniff? Check just in case
 	writter.Header().Set("X-Content-Type-Options", "nosniff")
 	writter.WriteHeader(status)
 

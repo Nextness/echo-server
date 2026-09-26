@@ -25,7 +25,7 @@ func TestHandlerEchoesRequest(t *testing.T) {
 	request.Host = "echo.test"
 
 	recorder := httptest.NewRecorder()
-	NewHandler(DefaultMaxBodyBytes).ServeHTTP(recorder, request)
+	newTestHandler(t, DefaultMaxBodyBytes).ServeHTTP(recorder, request)
 
 	expectedStatus := http.StatusOK
 	if recorder.Code != expectedStatus {
@@ -75,7 +75,7 @@ func TestHandlerRejectsOversizeBody(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader("12345"))
 	recorder := httptest.NewRecorder()
 
-	NewHandler(4).ServeHTTP(recorder, request)
+	newTestHandler(t, 4).ServeHTTP(recorder, request)
 	expectedStatus := http.StatusRequestEntityTooLarge
 	if recorder.Code != expectedStatus {
 		t.Fatalf("Got status = %d, but expected %d", recorder.Code, expectedStatus)
@@ -85,6 +85,10 @@ func TestHandlerRejectsOversizeBody(t *testing.T) {
 	expectedError := "request body exceeds the configured limit"
 	if response.Error != expectedError {
 		t.Errorf("Got Error = %q, but expected %q", response.Error, expectedError)
+	}
+	expectedBody := ""
+	if response.Body != expectedBody {
+		t.Errorf("Got Body = %q, but expected %q", response.Body, expectedBody)
 	}
 }
 
@@ -110,7 +114,7 @@ func TestHandlerAcceptsSupportedRequests(t *testing.T) {
 			request := httptest.NewRequest(test.method, test.target, strings.NewReader(test.body))
 			recorder := httptest.NewRecorder()
 
-			NewHandler(DefaultMaxBodyBytes).ServeHTTP(recorder, request)
+			newTestHandler(t, DefaultMaxBodyBytes).ServeHTTP(recorder, request)
 
 			expectedStatus := http.StatusOK
 			if recorder.Code != expectedStatus {
@@ -131,7 +135,7 @@ func TestHandlerAcceptsBodyAtLimit(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader("1234"))
 	recorder := httptest.NewRecorder()
 
-	NewHandler(4).ServeHTTP(recorder, request)
+	newTestHandler(t, 4).ServeHTTP(recorder, request)
 
 	expectedStatus := http.StatusOK
 	if recorder.Code != expectedStatus {
@@ -149,7 +153,7 @@ func TestHandlerReturnsBadRequestWhenBodyReadFails(t *testing.T) {
 	request.Body = failingReadCloser{}
 	recorder := httptest.NewRecorder()
 
-	NewHandler(DefaultMaxBodyBytes).ServeHTTP(recorder, request)
+	newTestHandler(t, DefaultMaxBodyBytes).ServeHTTP(recorder, request)
 
 	expectedStatus := http.StatusBadRequest
 	if recorder.Code != expectedStatus {
@@ -160,10 +164,14 @@ func TestHandlerReturnsBadRequestWhenBodyReadFails(t *testing.T) {
 	if response.Error != expectedError {
 		t.Errorf("Got Error = %q, but expected %q", response.Error, expectedError)
 	}
+	expectedBody := ""
+	if response.Body != expectedBody {
+		t.Errorf("Got Body = %q, but expected %q", response.Body, expectedBody)
+	}
 }
 
 func TestHandlerHeadResponseHasNoBody(t *testing.T) {
-	server := httptest.NewServer(NewHandler(DefaultMaxBodyBytes))
+	server := httptest.NewServer(newTestHandler(t, DefaultMaxBodyBytes))
 	t.Cleanup(server.Close)
 
 	response, err := server.Client().Head(server.URL + "/head")
@@ -189,7 +197,7 @@ func TestHandlerHeadResponseHasNoBody(t *testing.T) {
 func TestHandlerServesConcurrentRequests(t *testing.T) {
 	const requestCount = 32
 
-	handler := NewHandler(DefaultMaxBodyBytes)
+	handler := newTestHandler(t, DefaultMaxBodyBytes)
 	errorsChannel := make(chan error, requestCount)
 	var waitGroup sync.WaitGroup
 	expectedStatus := http.StatusOK
@@ -235,6 +243,16 @@ func decodeResponse(t *testing.T, recorder *httptest.ResponseRecorder) Response 
 		t.Fatalf("Got decode response error = %v, but expected nil", err)
 	}
 	return response
+}
+
+func newTestHandler(t *testing.T, maxBodyBytes int64) *Handler {
+	t.Helper()
+
+	handler, err := NewHandler(maxBodyBytes)
+	if err != nil {
+		t.Fatalf("Got NewHandler() error = %v, but expected nil", err)
+	}
+	return handler
 }
 
 type failingReadCloser struct{}

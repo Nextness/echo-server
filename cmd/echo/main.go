@@ -24,18 +24,19 @@ func main() {
 	}
 }
 
-// TODO: Check whether the server goroutine should be awaited after 'Shutdown' so no terminal server error is missed
-// TODO: Ensure the Kubernetes termination grace period is longer than the shutdown timeout
-
 func run(ctx context.Context) error {
 	cfg, err := loadConfig()
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
 	}
+	handler, err := echoHandler.NewHandler(cfg.MaxBodyBytes)
+	if err != nil {
+		return fmt.Errorf("create echo handler: %w", err)
+	}
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           echoHandler.NewHandler(cfg.MaxBodyBytes),
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
