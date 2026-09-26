@@ -26,7 +26,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-deploy-smoke:
+  ci-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
