@@ -19,7 +19,7 @@ func main() {
 	defer stop()
 
 	if err := run(ctx); err != nil {
-		slog.Error("server stopped  with an error", "error", err)
+		slog.Error("server stopped with an error", "error", err)
 		os.Exit(1)
 	}
 }
@@ -60,7 +60,7 @@ func run(ctx context.Context) error {
 		defer cancel()
 
 		if err := server.Shutdown(shutdownCtx); err != nil {
-			return fmt.Errorf("shutfown server: %w", err)
+			return fmt.Errorf("shutdown server: %w", err)
 		}
 		return nil
 	}
