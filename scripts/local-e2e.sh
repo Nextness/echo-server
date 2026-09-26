@@ -210,7 +210,7 @@ function create_and_test_environment() {
   ' <<<"${response}" >/dev/null
 
   jq . <<<"${response}"
-  printf 'Local end-to-end test passed. Run %s --delete to remove the environment.\n' "$0"
+  printf 'Local end-to-end test passed. Run bash scripts/local-e2e.sh --delete to remove the environment.\n'
 }
 
 case "${1:-}" in
