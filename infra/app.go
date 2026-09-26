@@ -7,11 +7,13 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
+// AppArgs configures the Echo Server deployment.
 type AppArgs struct {
 	Image    string
 	Replicas int
 }
 
+// deployEcho creates the Echo Server Deployment and ClusterIP Service.
 func deployEcho(ctx *pulumi.Context, args AppArgs) (*corev1.Service, error) {
 	labels := pulumi.StringMap{
 		"app.kubernetes.io/name": pulumi.String("echo-server"),
@@ -108,6 +110,8 @@ func deployEcho(ctx *pulumi.Context, args AppArgs) (*corev1.Service, error) {
 	return service, nil
 }
 
+// httpProbe returns an HTTP probe for path with the given initial delay
+// and period in seconds.
 func httpProbe(path string, initialDelay, period int) *corev1.ProbeArgs {
 	return &corev1.ProbeArgs{
 		HttpGet: &corev1.HTTPGetActionArgs{
