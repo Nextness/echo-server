@@ -7,8 +7,7 @@ import (
 )
 
 const (
-	defaultPort = 8080
-	// TODO: Should we make this public so that we don't have to repeat everywhere? Consider for later
+	defaultPort         = 8080
 	defaultMaxBodyBytes = int64(1 << 20)
 )
 
