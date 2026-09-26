@@ -1,0 +1,6 @@
+.git
+.github
+.pulumi-state
+infra
+coverage.out
+*.md
