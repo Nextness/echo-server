@@ -2,7 +2,7 @@
 
 This repository contains a small Echo Server written in Go. It accepts requests on any path and returns the request headers, query parameters, raw body, and path as JSON.
 
-The application is packaged as a minimal non-root container and deployed to a local Kind Kubernetes cluster with Pulumi. In CI it creates an ephemeral cluster for smoke tests.
+The application is packaged as a minimal non-root container and deployed to a local Kind Kubernetes cluster with Pulumi. CI creates an ephemeral cluster for smoke tests.
 
 ## Architecture
 
@@ -14,13 +14,13 @@ HTTP client
   -> stateless Go http.Handler
 ```
 
-Directory setup:
+Repository structure:
 
 - `internal/echo`: translates an HTTP request into the response contract;
 - `cmd/echo/config.go`: parses and validates process configuration;
 - `cmd/echo/main.go`: composes the handler, HTTP server, signals, and graceful shutdown;
 - `infra`: declares the Kubernetes Deployment and Service with Pulumi;
-- `scripts/` contains scripts relevant for the project;
+- `scripts/`: contains scripts relevant to the project;
 - GitHub Actions creates an ephemeral Kind cluster and verifies the deployed service end to end.
 
 ## Response contract
@@ -48,11 +48,10 @@ Every normal request path is handled. A successful request returns `200 OK` and 
 - `body` is a string containing the original payload; JSON input is not parsed and reserialized;
 - `path` excludes the query string because query parameters are returned separately;
 - Go canonicalizes header names, so a header such as `X-CI` is normally returned as `X-Ci`;
-- For requests:
-  - Request bodies are bounded by `MAX_BODY_BYTES`;
-  - An oversized body returns `413 Request Entity Too Large`;
-  - For body-read failure it returns `400 Bad Request`;
-  - For `413`and `400` errors it returns the same JSON envelope, leaving the `body` empty, and adding an `error` field.
+- Request bodies are bounded by `MAX_BODY_BYTES`;
+- An oversized body returns `413 Request Entity Too Large`;
+- Other body-read failures return `400 Bad Request`;
+- Both `413` and `400` responses use the same JSON envelope, leave `body` empty, and add an `error` field.
 
 ## Configuration
 
@@ -69,12 +68,14 @@ Every normal request path is handled. A successful request returns `200 OK` and 
 make help               # list all available Make commands
 make check-requirements # check requirements to build and run this project
 make test               # runs all formatting checks, vet checks, race-enabled unit tests, and Pulumi tests
+make test-e2e           # deploys locally and validates the response through Kubernetes, optionally add E2E_ARGS=--delete
+                        #   to delete the resources created in the e2e test
 make build-echo-server  # builds a local executable at build/echo-server
-make run-infra          # runs the infra configuration - requires the Kind cluster to exist read SETUP.md before running this
+make run-infra          # applies the infrastructure; requires the Kind cluster described in SETUP.md
 make clean              # deletes build/
 ```
 
-For more details on how to properly setup and run this project, read [SETUP.md](./SETUP.md).
+For more details on how to properly set up and run this project, read [SETUP.md](./SETUP.md).
 
 ## Container and Kubernetes safeguards
 
@@ -98,7 +99,7 @@ Pulumi creates two Kubernetes resources:
 - A one-replica `Deployment` running `echo-server:local` by default;
 - A `ClusterIP` `Service` exposing port `80` and targeting the container's named `http` port on `8080`.
 
-The image uses `imagePullPolicy: Never` because it is copied directly into Kind with `kind load docker-image` (thefore no registry is required). Pulumi uses a repository-local filesystem backend in `.pulumi-state/` and explicitly targets the `kind-echo` kubeconfig context.
+The image uses `imagePullPolicy: Never` because it is copied directly into Kind with `kind load docker-image` (therefore no registry is required). Pulumi uses a repository-local filesystem backend in `.pulumi-state/` and explicitly targets the `kind-echo` kubeconfig context.
 
 ## Testing strategy
 

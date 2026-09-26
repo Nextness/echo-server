@@ -13,14 +13,14 @@ Install these tools before starting:
 - [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [Pulumi CLI](https://www.pulumi.com/docs/iac/download-install/)
-- Git, Bash 4 or newer, and curl
+- GNU Make, Git, Bash, curl, and jq
 - `gh` only if configuring the GitHub Actions secret from the command line
 
 **Note**: The shell script uses Bash features such as arrays and `mapfile`. On Windows, use WSL2 rather than attempting to run it from Command Prompt or PowerShell.
 
 ### Tested versions
 
-The following table contains the programs and the versions used initially to run the project as a whole. If you are not sure if the dependecies you have match, run the command `make check-requirements`. This command checks Bash, Go, the Docker CLI and daemon, Kind, kubectl, Pulumi, Git, and curl. It prints every missing, outdated, or unusable requirement and exits with a non-zero status if any check fails. Installed versions may be equal to or newer than the versions in the table above.
+The following table lists the versions used to run the complete project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`. This command checks Bash, GNU Make, Go, the Docker CLI and daemon, Kind, kubectl, Pulumi, Git, curl, and jq. It prints every missing, outdated, or unusable requirement and exits with a non-zero status if any check fails. Installed command-line tool versions may be equal to or newer than the corresponding versions in the table below.
 
 If you don't have `make` installed in your system, you can use bash directly with the following command `bash scripts/check-requirements.sh`.
 
@@ -38,6 +38,7 @@ If you don't have `make` installed in your system, you can use bash directly wit
 | Pulumi Kubernetes SDK/provider | `v4.34.2`                          |
 | Git                            | `2.55.0`                           |
 | curl                           | `8.21.0`                           |
+| jq                             | `1.8.2`                            |
 | Kind GitHub Action             | `v1.15.0`                          |
 
 **Note**: The Kubernetes node image is pinned to: `kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5`
@@ -46,15 +47,15 @@ If you don't have `make` installed in your system, you can use bash directly wit
 
 ### Optional local checks
 
-You may run formatting, vets and all tests (with race detection and coverage) to make sure the project is up-to-date and nothing is missing. Alternativaly, you may run only formatting checks.
+You may run formatting checks, vet, and all tests with race detection and coverage to make sure the project is up to date. Alternatively, you may run only the non-mutating formatting check.
 
 ```bash
 make test
 # or
-make fmt
+make fmt-check
 ```
 
-## 1.  Create the Kind cluster
+## 1. Create the Kind cluster
 
 Pulumi deploys resources into an existing Kubernetes cluster, in other words it does not create the Kind cluster itself. Therefore, we must create the cluster with the reviewed, immutable node image:
 
@@ -99,19 +100,21 @@ Using the `Dockerfile` provided in the project, we need to create the image we w
 docker build --tag echo-server:local .
 ```
 
-Verify both the host image and the copy in Kind's container runtime:
+Verify the image in the host Docker daemon:
 
 ```bash
 docker image inspect echo-server:local
-docker exec echo-control-plane crictl images | grep echo-server
 ```
 
-Optionally, we may run the docker image locally to make sure it works properly.
+Optionally, run the image locally in a dedicated terminal:
 
 ```bash
 docker run --rm --name echo-server -p 8080:8080 echo-server:local
+```
 
-# The following command should echo back the headers, data, path and tags.
+From another terminal, verify that it echoes the request headers, body, path, and query parameters:
+
+```bash
 curl --fail-with-body \
   --request POST \
   --header 'Content-Type: application/json' \
@@ -120,12 +123,20 @@ curl --fail-with-body \
   'http://localhost:8080/demo?tag=go&tag=kind'
 ```
 
+Press `Ctrl+C` in the first terminal to stop and remove the standalone container before continuing.
+
 The image must be loaded before deployment because the Kubernetes container uses `imagePullPolicy: Never`. Kubernetes will not download it from a registry.
 
-We must perform the load separetely:
+Load the image into Kind:
 
 ```bash
 kind load docker-image echo-server:local --name echo
+```
+
+Verify the copy in Kind's container runtime:
+
+```bash
+docker exec echo-control-plane crictl images | grep echo-server
 ```
 
 ## 3. Configure the local Pulumi backend
@@ -141,7 +152,9 @@ The backend is ignored by Git and does not require a Pulumi Cloud account.
 
 ### Passphrase
 
-Pulumi's local passphrase protects encrypted stack configuration. The passphrase must never be committed or written into documentation. However, since this is an exercise, the password is simple and the salt associated to the password is commited in the source code (specially considering the resources are created in an ephemeral cluster). Again, since this is an exercise, use this password 'local-ci-only'. Alternatively, remove the salt and create a new password.
+Pulumi's local passphrase protects encrypted stack configuration. For this exercise, the committed local stack configuration was generated with the shared passphrase `local-ci-only` so that local development and ephemeral CI can use the same configuration. Enter it when Pulumi prompts for the passphrase.
+
+The committed `encryptionsalt` in `infra/Pulumi.local.yaml` is not itself a password. Do not delete or edit it to rotate the passphrase for an existing stack. A production repository should use a unique, undisclosed passphrase and a supported Pulumi secrets-provider migration process.
 
 ## 4. Preview and deploy
 
@@ -258,10 +271,31 @@ kubectl --context kind-echo port-forward service/echo-server 18080:80
 
 Then send the request to `http://127.0.0.1:18080`.
 
+## Ongoing operations
 
-# Optional Improvement
+### Updating the local image
 
-## Persistent local endpoint
+Rebuilding the same `echo-server:local` tag does not change the Deployment specification, so an existing Pod may continue running the previous image. The clearest local iteration workflow is to use a new tag:
+
+```bash
+image_ref="echo-server:dev-$(date +%s)"
+docker build --tag "${image_ref}" .
+kind load docker-image "${image_ref}" --name echo
+pulumi -C infra config set image "${image_ref}" --stack local
+pulumi -C infra up --yes --stack local
+kubectl --context kind-echo rollout status deployment/echo-server --timeout=120s
+```
+
+To return to the default tag:
+
+```bash
+pulumi -C infra config set image echo-server:local --stack local
+pulumi -C infra up --yes --stack local
+```
+
+## Optional improvement
+
+### Persistent local endpoint
 
 Port forwarding is the recommended default because it keeps the Kubernetes resources portable and exposes the service only while the command runs.
 
@@ -315,9 +349,33 @@ pulumi -C infra up --yes --stack local
 
 The service can then be reached directly at `http://127.0.0.1:8080` without `kubectl port-forward`. A real cloud environment would normally use an Ingress or `LoadBalancer` Service instead of this Kind-specific arrangement.
 
-# Troubleshooting
+## GitHub Actions
 
-## Docker permission denied
+The workflow creates a new Kind cluster and local Pulumi backend for each job:
+
+- Pull requests run tests, build and load the image, and execute `pulumi preview`.
+- Pushes to `main` run `pulumi up`, wait for the Deployment, and validate the response contract.
+- Manual runs can select either `preview` or `apply`.
+
+The CI environment and deployed service disappear when the runner is destroyed; this workflow is deployment validation, not a persistent environment.
+
+### Required repository secret
+
+Create a repository Actions secret named `PULUMI_CONFIG_PASSPHRASE`. Its value must be the exercise passphrase documented above because it was used to generate the encryption salt in `infra/Pulumi.local.yaml`.
+
+Set it interactively with the GitHub CLI:
+
+```bash
+gh secret set PULUMI_CONFIG_PASSPHRASE
+```
+
+Alternatively, use **Repository Settings → Secrets and variables → Actions → New repository secret**.
+
+The workflow receives the passphrase through the GitHub secret rather than hardcoding it in the workflow or stack configuration. GitHub does not expose repository secrets to workflows triggered by pull requests from forks, so Pulumi preview cannot run for an untrusted fork with this workflow design.
+
+## Troubleshooting
+
+### Docker permission denied
 
 Confirm that the current user can access Docker:
 
@@ -327,7 +385,7 @@ docker info
 
 If access to `/var/run/docker.sock` is denied, fix the host's non-root Docker configuration and begin a new login session before using Kind.
 
-## Pulumi reports that `kind-echo` does not exist
+### Pulumi reports that `kind-echo` does not exist
 
 The Kind cluster has not been created or its kubeconfig context is unavailable:
 
@@ -339,7 +397,7 @@ kubectl --context kind-echo cluster-info
 
 Create the `echo` cluster before running `pulumi preview` or `pulumi up`.
 
-## Pulumi local backend does not exist
+### Pulumi local backend does not exist
 
 Create the directory before logging in:
 
@@ -348,11 +406,11 @@ mkdir -p .pulumi-state
 pulumi login "file://${PWD}/.pulumi-state"
 ```
 
-## Pulumi reports `incorrect passphrase`
+### Pulumi reports `incorrect passphrase`
 
-The supplied `PULUMI_CONFIG_PASSPHRASE` does not match the encryption salt in the selected stack configuration. Use the original passphrase or create the independent `review` stack described above. Do not replace the GitHub secret without also deliberately rotating or regenerating the stack configuration.
+The supplied `PULUMI_CONFIG_PASSPHRASE`, or the value entered at the prompt, does not match the encryption salt in the selected stack configuration. Use the shared exercise passphrase documented in the Passphrase section. Do not replace the GitHub secret or edit `encryptionsalt` without deliberately migrating the stack's secrets provider.
 
-## Pod reports `ErrImageNeverPull`
+### Pod reports `ErrImageNeverPull`
 
 The image exists in the host Docker daemon but has not been copied into Kind, or Pulumi references a different tag. Compare the configured and loaded images:
 
@@ -370,7 +428,7 @@ kind load docker-image echo-server:local --name echo
 
 If Pulumi uses a different tag, substitute that complete tag in the load command.
 
-## Pulumi reports no changes after rebuilding
+### Pulumi reports no changes after rebuilding
 
 An image tag is only a string in the Deployment specification. Rebuilding the same tag does not cause a rollout. Use a unique image tag as shown in “Updating the local image,” or explicitly restart the Deployment after loading the replacement image:
 
@@ -379,7 +437,7 @@ kubectl --context kind-echo rollout restart deployment/echo-server
 kubectl --context kind-echo rollout status deployment/echo-server --timeout=120s
 ```
 
-## The Pod does not become ready
+### The Pod does not become ready
 
 Inspect its status, Kubernetes events, and application logs:
 
@@ -391,7 +449,7 @@ kubectl --context kind-echo get events \
 kubectl --context kind-echo logs deployment/echo-server
 ```
 
-## Port `8080` is already in use
+### Port `8080` is already in use
 
 Use another local port without changing Kubernetes:
 
@@ -399,7 +457,7 @@ Use another local port without changing Kubernetes:
 kubectl --context kind-echo port-forward service/echo-server 18080:80
 ```
 
-## The stack already exists
+### The stack already exists
 
 Select it rather than initializing it again:
 
@@ -407,55 +465,9 @@ Select it rather than initializing it again:
 pulumi -C infra stack select local
 ```
 
-# Optional additions and genral operations
+## Optional destruction and cleanup
 
-## Updating the local image
-
-Rebuilding the same `echo-server:local` tag does not change the Deployment specification, so an existing Pod may continue running the previous image. The clearest local iteration workflow is to use a new tag:
-
-```bash
-image_ref="echo-server:dev-$(date +%s)"
-docker build --tag "${image_ref}" .
-kind load docker-image "${image_ref}" --name echo
-pulumi -C infra config set image "${image_ref}" --stack local
-pulumi -C infra up --yes --stack local
-kubectl --context kind-echo rollout status deployment/echo-server --timeout=120s
-```
-
-To return to the default tag:
-
-```bash
-pulumi -C infra config set image echo-server:local --stack local
-pulumi -C infra up --yes --stack local
-```
-
-## GitHub Actions
-
-The workflow creates a new Kind cluster and local Pulumi backend for each job:
-
-- Pull requests run tests, build and load the image, and execute `pulumi preview`.
-- Pushes to `main` run `pulumi up`, wait for the Deployment, and validate the response contract.
-- Manual runs can select either `preview` or `apply`.
-
-The CI environment and deployed service disappear when the runner is destroyed; this workflow is deployment validation, not a persistent environment.
-
-### Required repository secret
-
-Create a repository Actions secret named `PULUMI_CONFIG_PASSPHRASE`. Its value must be the same passphrase used to generate the encryption salt in `infra/Pulumi.local.yaml`.
-
-Set it interactively with the GitHub CLI:
-
-```bash
-gh secret set PULUMI_CONFIG_PASSPHRASE
-```
-
-Alternatively, use **Repository Settings → Secrets and variables → Actions → New repository secret**.
-
-Do not put the passphrase in the workflow, stack configuration, command history, or documentation. GitHub does not expose repository secrets to workflows triggered by pull requests from forks, so Pulumi preview cannot run for an untrusted fork with this workflow design.
-
-# Optional destruction and clean up
-
-## Graceful teardown
+### Graceful teardown
 
 Reverse the setup order so Pulumi can delete Kubernetes resources while the cluster is still reachable.
 
@@ -499,15 +511,7 @@ After removing the stack and logging out, remove the local backend directory if 
 rm -rf -- .pulumi-state
 ```
 
-If an independent reviewer stack was created, use the following commands instead of the `local` destroy and stack-removal commands above. Run them before `kind delete cluster`, then remove the untracked configuration after the stack is gone:
-
-```bash
-pulumi -C infra destroy --yes --stack review
-pulumi -C infra stack rm review --yes --remove-backups
-rm -- infra/Pulumi.review.yaml
-```
-
-## Optional Docker image cleanup
+### Optional Docker image cleanup
 
 List application images created for this project:
 
@@ -539,3 +543,20 @@ docker image rm \
 ```
 
 Do not use `docker system prune --all --volumes` for project cleanup. It is host-wide and can remove unrelated images, build cache, networks, and persistent data.
+
+# End to end Automation
+
+To automate the complete local workflow after installing the prerequisites, run:
+
+```bash
+make test-e2e
+```
+
+The script creates or reuses the `echo` Kind cluster, builds and loads the application image, deploys it with Pulumi, and validates the response contract through the Kubernetes Service.
+
+Remove the project environment with:
+
+```bash
+make test-e2e E2E_ARGS=--delete
+```
+

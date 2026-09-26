@@ -1,5 +1,3 @@
-set -Eeuo pipefail
-
 repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 mapfile -t go_files < <(git -C "${repository_root}" ls-files '*.go')

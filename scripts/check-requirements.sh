@@ -9,6 +9,7 @@ readonly MIN_KUBECTL_VERSION="1.37.0"
 readonly MIN_PULUMI_VERSION="3.264.0"
 readonly MIN_GIT_VERSION="2.55.0"
 readonly MIN_CURL_VERSION="8.21.0"
+readonly MIN_JQ_VERSION="1.8.2"
 
 failure_count=0
 
@@ -134,6 +135,7 @@ check_version "kubectl" "kubectl" "${MIN_KUBECTL_VERSION}" version --client
 check_version "Pulumi CLI" "pulumi" "${MIN_PULUMI_VERSION}" version
 check_version "Git" "git" "${MIN_GIT_VERSION}" --version
 check_version "curl" "curl" "${MIN_CURL_VERSION}" --version
+check_version "jq" "jq" "${MIN_JQ_VERSION}" --version
 
 printf '\n'
 if ((failure_count > 0));
