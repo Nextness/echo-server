@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 set -Eeuo pipefail
 
 repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -45,8 +43,7 @@ fi
   go test ./...
 )
 
-docker build --pull --tag "${IMAGE_REF}" "${repository_root}"
+docker buildx build --pull --load --tag "${IMAGE_REF}" "${repository_root}"
 kind load docker-image "${IMAGE_REF}" --name "${KIND_CLUSTER_NAME}"
 
 echo "Loaded ${IMAGE_REF} into Kind cluster ${KIND_CLUSTER_NAME}"
-

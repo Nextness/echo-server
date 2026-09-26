@@ -45,6 +45,11 @@ jobs:
           cache: true
           cache-dependency-path: infra/go.sum
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.3.0
+        with:
+          version: v0.37.1
+
       - name: Create Kind cluster
         uses: helm/kind-action@v1.15.0
         with:
@@ -66,7 +71,8 @@ jobs:
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
         run: |
-          if [[ -z "${PULUMI_CONFIG_PASSPHRASE}" ]]; then
+          if [[ -z "${PULUMI_CONFIG_PASSPHRASE}" ]];
+          then
             echo "PULUMI_CONFIG_PASSPHRASE repository secret is not configured or is unavailable" >&2
             exit 1
           fi
@@ -107,15 +113,18 @@ jobs:
           trap 'kill "${port_forward_pid}" 2>/dev/null || true' EXIT
 
           ready=false
-          for attempt in {1..20}; do
-            if curl --silent --fail http://127.0.0.1:18080/readyz >/dev/null; then
+          for attempt in {1..20};
+          do
+            if curl --silent --fail http://127.0.0.1:18080/readyz >/dev/null;
+            then
               ready=true
               break
             fi
             sleep 1
           done
 
-          if [[ "${ready}" != true ]]; then
+          if [[ "${ready}" != true ]];
+          then
             echo "application did not become ready after 20 attempts" >&2
             cat "${RUNNER_TEMP}/port-forward.log" >&2
             kubectl get deployment,service,pod -o wide >&2
