@@ -1,0 +1,123 @@
+name: echo-server-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Pulumi operation
+        type: choice
+        required: true
+        default: preview
+        options:
+          - preview
+          - apply
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-deploy-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      KIND_CLUSTER_NAME: echo
+      IMAGE_REF: echo-server:${{ github.sha }}
+      PULUMI_BACKEND_URL: file://${{ github.workspace }}/.pulumi-state
+      PULUMI_CONFIG_PASSPHRASE: local-ci-only
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: infra/go.sum
+
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1.15.0
+        with:
+          cluster_name: echo
+          version: v0.33.0
+          kubectl_version: v1.37.0
+          node_image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+          wait: 120s
+
+      - name: Install Pulumi
+        uses: pulumi/actions@v7
+        with:
+          pulumi-version: 3.265.0
+
+      - name: Test, build, and load image
+        run: bash ./scripts/ci.sh
+
+      - name: Initialize local Pulumi stack
+        run: |
+          mkdir -p "${{ github.workspace }}/.pulumi-state"
+          pulumi login "${PULUMI_BACKEND_URL}"
+          pulumi -C infra stack select local --create
+          pulumi -C infra config set image "${IMAGE_REF}" --stack local
+
+      - name: Preview infrastructure
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.operation == 'preview')
+        run: pulumi -C infra preview --diff --non-interactive
+
+      - name: Deploy infrastructure
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'apply')
+        run: pulumi -C infra up --yes --non-interactive
+
+      - name: Wait for application
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'apply')
+        run: kubectl rollout status deployment/echo-server --timeout=120s
+
+      - name: Smoke test response contract
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'apply')
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          kubectl port-forward service/echo-server 18080:80 >"${RUNNER_TEMP}/port-forward.log" 2>&1 &
+          port_forward_pid=$!
+          trap 'kill "${port_forward_pid}" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in {1..20}; do
+            if curl --silent --fail http://127.0.0.1:18080/readyz >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ "${ready}" != true ]]; then
+            echo "application did not become ready after 20 attempts" >&2
+            cat "${RUNNER_TEMP}/port-forward.log" >&2
+            kubectl get deployment,service,pod -o wide >&2
+            exit 1
+          fi
+
+          response="$(curl --silent --show-error --fail-with-body \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header 'X-CI: true' \
+            --data '{"message":"hello"}' \
+            'http://127.0.0.1:18080/ci/check?tag=go&tag=kind')"
+
+          jq -e '
+            .path == "/ci/check" and
+            .body == "{\"message\":\"hello\"}" and
+            .params.tag == ["go", "kind"] and
+            .headers["X-Ci"] == ["true"]
+          ' <<<"${response}"
