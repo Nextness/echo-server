@@ -4,3 +4,4 @@
 infra
 coverage.out
 *.md
+/build

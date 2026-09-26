@@ -1,0 +1,123 @@
+# Echo Server
+
+This repository contains a small Echo Server written in Go. It accepts requests on any path and returns the request headers, query parameters, raw body, and path as JSON.
+
+The application is packaged as a minimal non-root container and deployed to a local Kind Kubernetes cluster with Pulumi. In CI it creates an ephemeral cluster for smoke tests.
+
+## Architecture
+
+```text
+HTTP client
+  -> kubectl port-forward
+  -> ClusterIP Service :80
+  -> Deployment Pod :8080
+  -> stateless Go http.Handler
+```
+
+Directory setup:
+
+- `internal/echo`: translates an HTTP request into the response contract;
+- `cmd/echo/config.go`: parses and validates process configuration;
+- `cmd/echo/main.go`: composes the handler, HTTP server, signals, and graceful shutdown;
+- `infra`: declares the Kubernetes Deployment and Service with Pulumi;
+- `scripts/` contains scripts relevant for the project;
+- GitHub Actions creates an ephemeral Kind cluster and verifies the deployed service end to end.
+
+## Response contract
+
+Every normal request path is handled. A successful request returns `200 OK` and `Content-Type: application/json` with this shape:
+
+```json
+{
+  "headers": {
+    "Content-Type": ["application/json"],
+    "X-Demo": ["one", "two"]
+  },
+  "params": {
+    "tag": ["go", "kubernetes"]
+  },
+  "body": "{\"message\":\"hello\"}",
+  "path": "/anything/here"
+}
+```
+
+**Details**
+
+- Header and query-parameter values are arrays so repeated values are preserved;
+- `Host` is included even though Go stores it separately from `Request.Header`;
+- `body` is a string containing the original payload; JSON input is not parsed and reserialized;
+- `path` excludes the query string because query parameters are returned separately;
+- Go canonicalizes header names, so a header such as `X-CI` is normally returned as `X-Ci`;
+- For requests:
+  - Request bodies are bounded by `MAX_BODY_BYTES`;
+  - An oversized body returns `413 Request Entity Too Large`;
+  - For body-read failure it returns `400 Bad Request`;
+  - For `413`and `400` errors it returns the same JSON envelope, leaving the `body` empty, and adding an `error` field.
+
+## Configuration
+
+| Environment variable | Default   | Validation                       | Purpose                   |
+| -------------------- | --------: | -------------------------------- | ------------------------- |
+| `PORT`               | `8080`    | Integer from `1` through `65535` | HTTP listen port          |
+| `MAX_BODY_BYTES`     | `1048576` | Positive integer                 | Maximum request-body size |
+
+**Note**: Invalid configuration prevents the server from starting.
+
+## Relevant Commands
+
+```bash
+make help               # list all available Make commands
+make check-requirements # check requirements to build and run this project
+make test               # runs all formatting checks, vet checks, race-enabled unit tests, and Pulumi tests
+make build-echo-server  # builds a local executable at build/echo-server
+make run-infra          # runs the infra configuration - requires the Kind cluster to exist read SETUP.md before running this
+make clean              # deletes build/
+```
+
+For more details on how to properly setup and run this project, read [SETUP.md](./SETUP.md).
+
+## Container and Kubernetes safeguards
+
+- Multi-stage build producing a statically linked Linux binary;
+- `scratch` runtime image with no shell or package manager;
+- Numeric non-root user `65532:65532`;
+- Read-only root filesystem and disabled privilege escalation;
+- All Linux capabilities dropped and `RuntimeDefault` seccomp enabled;
+- Service account token automount disabled;
+- Explicit CPU and memory requests and limits;
+- Readiness and liveness probes through the named `http` port;
+- HTTP server read, write, idle, and header timeouts;
+- Ten-second graceful HTTP shutdown within Kubernetes' fifteen-second termination grace period.
+
+The service has no external dependencies, so `/readyz` and `/healthz` deliberately use the normal catch-all echo handler. A successful HTTP response proves that the process can serve requests without adding special health-check behavior.
+
+## Infrastructure
+
+Pulumi creates two Kubernetes resources:
+
+- A one-replica `Deployment` running `echo-server:local` by default;
+- A `ClusterIP` `Service` exposing port `80` and targeting the container's named `http` port on `8080`.
+
+The image uses `imagePullPolicy: Never` because it is copied directly into Kind with `kind load docker-image` (thefore no registry is required). Pulumi uses a repository-local filesystem backend in `.pulumi-state/` and explicitly targets the `kind-echo` kubeconfig context.
+
+## Testing strategy
+
+- Handler tests cover methods, paths, raw and Unicode bodies, repeated headers and query parameters, body limits, read errors, HEAD semantics, and concurrent requests;
+- Configuration tests cover defaults, custom values, boundaries, and invalid values;
+- Server tests cover invalid configuration, listener errors, and graceful cancellation;
+- Pulumi mock tests validate configuration, labels, image settings, ports, probes, security settings, and the Service contract;
+- `go test -race` checks application code for data races;
+- GitHub Actions deploys the image to a real Kind cluster (which is ephemeral by design) and validates the response contract through the Kubernetes Service.
+
+Pull requests run a Pulumi preview. Pushes to `main` apply the infrastructure to the ephemeral Kind cluster and run the smoke test.
+
+## Deliberate tradeoffs
+
+This exercise intentionally avoids components that do not improve the required local workflow:
+
+- No HTTP framework: the standard library is enough;
+- No image registry: `kind load` is simpler for a local-only cluster;
+- No Ingress by default: port forwarding is sufficient and keeps the Kubernetes resources portable for such a simple project;
+- No Helm chart: Pulumi already owns the Deployment and Service;
+- No custom Pulumi component: two resources do not justify abstraction layers;
+- No HPA, PDB, database, authentication, TLS, DNS, or observability stack: these are outside the requested scope.
