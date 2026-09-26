@@ -90,13 +90,13 @@ jobs:
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.operation == 'preview')
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
-        run: pulumi -C infra preview --diff --non-interactive
+        run: pulumi -C infra preview --diff --non-interactive --stack local
 
       - name: Deploy infrastructure
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'apply')
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
-        run: pulumi -C infra up --yes --non-interactive
+        run: pulumi -C infra up --yes --non-interactive --stack local
 
       - name: Wait for application
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'apply')
