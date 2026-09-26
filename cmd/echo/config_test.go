@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	echoHandler "github.com/nextness/echo-server/internal/echo"
+)
 
 func TestLoadConfigUsesDefaults(t *testing.T) {
 	t.Setenv("PORT", "")
@@ -15,7 +19,7 @@ func TestLoadConfigUsesDefaults(t *testing.T) {
 	if cfg.Port != expectedPort {
 		t.Fatalf("Got PORT = %d, but expected %d", cfg.Port, expectedPort)
 	}
-	expectedMaxBodyBytes := defaultMaxBodyBytes
+	expectedMaxBodyBytes := echoHandler.DefaultMaxBodyBytes
 	if cfg.MaxBodyBytes != expectedMaxBodyBytes {
 		t.Fatalf("Got MAX_BODY_BYTES = %d, but expected %d", cfg.MaxBodyBytes, expectedMaxBodyBytes)
 	}
