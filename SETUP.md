@@ -47,7 +47,7 @@ If you don't have `make` installed in your system, you can use bash directly wit
 
 ### Optional local checks
 
-You may run formatting checks, vet, and all tests with race detection and coverage to make sure the project is up to date. Alternatively, you may run only the non-mutating formatting check.
+You may run formatting checks, vet, and all tests with race detection and coverage to make sure the project is up to date. Alternatively, you may run only the formatting check.
 
 ```bash
 make test
@@ -299,23 +299,7 @@ pulumi -C infra up --yes --stack local
 
 Port forwarding is the recommended default because it keeps the Kubernetes resources portable and exposes the service only while the command runs.
 
-For local development only, a Kind host-port mapping and Kubernetes NodePort can make `127.0.0.1:8080` available for the lifetime of the cluster. This option is not enabled in the repository.
-
-Create `kind-config.yaml`:
-
-```yaml
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-  - role: control-plane
-    extraPortMappings:
-      - containerPort: 30080
-        hostPort: 8080
-        listenAddress: "127.0.0.1"
-        protocol: TCP
-```
-
-The Service must also be changed to `NodePort` with the matching port:
+For local development on a Linux host, Pulumi can expose the Service through a persistent `NodePort`. This option is not enabled in the repository. Change the Service specification in `infra/app.go` to:
 
 ```go
 Spec: corev1.ServiceSpecArgs{
@@ -332,22 +316,26 @@ Spec: corev1.ServiceSpecArgs{
 },
 ```
 
-Kind port mappings are fixed when the node container is created. Destroy the Pulumi resources before recreating the cluster:
+Apply the Pulumi change:
 
 ```bash
-pulumi -C infra destroy --yes --stack local
-kind delete cluster --name echo
-
-kind create cluster \
-  --name echo \
-  --config kind-config.yaml \
-  --image kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
-
-kind load docker-image echo-server:local --name echo
 pulumi -C infra up --yes --stack local
 ```
 
-The service can then be reached directly at `http://127.0.0.1:8080` without `kubectl port-forward`. A real cloud environment would normally use an Ingress or `LoadBalancer` Service instead of this Kind-specific arrangement.
+Retrieve the Kind node IP and access the Service without `kubectl port-forward`:
+
+```bash
+node_ip="$(
+  kubectl --context kind-echo get node echo-control-plane \
+    -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}'
+)"
+
+curl --fail-with-body "http://${node_ip}:30080/demo?tag=go&tag=kind" | jq
+```
+
+The endpoint remains available while the Service and Kind cluster are running. This relies on the Linux host being able to route to the Docker bridge address used by the Kind node. Environments that cannot reach that address should continue using port forwarding. Binding specifically to `127.0.0.1` would still require a Kind host-port mapping outside the current Pulumi-managed Kubernetes resources. A real cloud environment would normally use an Ingress or `LoadBalancer` Service instead of this local NodePort arrangement.
+
+**Note**: This is a local-development convenience rather than the recommended approach. It avoids keeping a port-forward process running, but requires resolving the Kind node IP and **only works** when the host can route to the Docker bridge network.
 
 ## GitHub Actions
 
