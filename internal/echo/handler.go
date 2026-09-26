@@ -29,14 +29,14 @@ func NewHandler(maxBodyBytes int64) (*Handler, error) {
 	return &Handler{maxBodyBytes}, nil
 }
 
-func (handler *Handler) ServeHTTP(writter http.ResponseWriter, request *http.Request) {
+func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	headers := request.Header.Clone()
 
 	if request.Host != "" {
 		headers.Set("Host", request.Host)
 	}
 
-	body, err := io.ReadAll(http.MaxBytesReader(writter, request.Body, handler.maxBodyBytes))
+	body, err := io.ReadAll(http.MaxBytesReader(writer, request.Body, handler.maxBodyBytes))
 	response := Response{
 		Headers: headers,
 		Params:  request.URL.Query(),
@@ -57,9 +57,9 @@ func (handler *Handler) ServeHTTP(writter http.ResponseWriter, request *http.Req
 		response.Body = string(body)
 	}
 
-	writter.Header().Set("Content-Type", "application/json")
-	writter.Header().Set("X-Content-Type-Options", "nosniff")
-	writter.WriteHeader(status)
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Header().Set("X-Content-Type-Options", "nosniff")
+	writer.WriteHeader(status)
 
-	_ = json.NewEncoder(writter).Encode(response)
+	_ = json.NewEncoder(writer).Encode(response)
 }
