@@ -10,12 +10,12 @@ COPY internal ./internal
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -ldflags="-s -w" \
-    -o /out/echo-service \
+    -o /out/echo-server \
     ./cmd/echo
 
 FROM scratch
-COPY --from=build --chown=65532:65532 /out/echo-service /echo-service
+COPY --from=build --chown=65532:65532 /out/echo-server /echo-server
 
 USER 65532:65532
 EXPOSE 8080
-ENTRYPOINT ["/echo-service"]
+ENTRYPOINT ["/echo-server"]

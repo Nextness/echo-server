@@ -1,0 +1,3 @@
+/.pulumi-state/
+/coverage.out
+/echo-server
