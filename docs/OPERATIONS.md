@@ -31,15 +31,14 @@ If the Deployment already uses `echo-server:local`, follow the [restart instruct
 
 Every workflow run executes `scripts/ci.sh` to run tests, build the image, and load it into a new Kind cluster. Pulumi uses a local backend for that run. The trigger determines the remaining steps:
 
-- Opening, updating, or reopening a pull request targeting `main` runs `pulumi preview`.
 - Pushes outside `main` run `pulumi preview`.
 - Pushes to `main` run `pulumi up`, wait for the Deployment, and validate the response contract.
 - Manual runs can select either `preview` or `apply`.
 
-Every push triggers CI, including feature branches without an open pull request.
+Every push triggers CI, including feature branches without an open pull request. Pull requests from branches in this repository use the branch's push check, so updating a pull request does not trigger a second run. These checks validate the pushed commit; there is no separate test of GitHub's proposed merge commit or base-repository workflow run for pull requests from forks.
 
 The CI environment and deployed service disappear when the runner is destroyed; this workflow is deployment validation, not a persistent environment.
 
 ## Passphrase in CI
 
-The workflow sets `PULUMI_CONFIG_PASSPHRASE` to the [documented exercise passphrase](../SETUP.md#passphrase) directly instead of using a repository secret. The stack contains no encrypted values and the value is already public, so there is nothing to protect. No repository secret configuration is required, including for previews of pull requests from forks.
+The workflow sets `PULUMI_CONFIG_PASSPHRASE` to the [documented exercise passphrase](../SETUP.md#passphrase) directly instead of using a repository secret. The stack contains no encrypted values and the value is already public, so there is nothing to protect. No repository secret configuration is required.
