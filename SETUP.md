@@ -292,8 +292,6 @@ To automate the complete local workflow after installing the prerequisites, run:
 make test-e2e
 ```
 
-The script creates or reuses the `echo` Kind cluster, builds and loads the application image under a unique tag (for example, `echo-server:e2e-20260926213000`), configures Pulumi with that exact reference, deploys it, and validates the response contract through `kubectl port-forward` to a Pod selected by the Service. It also checks that the Deployment references the built tag, so rebuilding the same tag cannot make the smoke test pass against a stale Pod. The Pulumi image configuration is left pointing at the deployed tag while the environment exists, so a later `make run-infra` deploys the same image; `--delete` restores the previous image setting without touching the rest of the configuration.
-
 Remove the project environment with:
 
 ```bash
