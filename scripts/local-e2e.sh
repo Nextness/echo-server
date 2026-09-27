@@ -10,12 +10,12 @@ readonly node_image="kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd5664
 readonly stack_name="local"
 readonly backend_directory="${repository_root}/.pulumi-state"
 readonly backend_url="file://${backend_directory}"
+readonly stack_config_file="${repository_root}/infra/Pulumi.${stack_name}.yaml"
+readonly stack_config_backup="${backend_directory}/previous-stack-config.yaml"
 readonly local_port="18080"
 
 port_forward_pid=""
 port_forward_log=""
-previous_image=""
-image_config_modified=false
 
 function usage() {
   printf '%s\n' \
@@ -24,8 +24,9 @@ function usage() {
     'Without arguments, create the local Kind environment, build and deploy a uniquely' \
     'tagged application image, and verify its response contract.' \
     '' \
-    '  --delete  Destroy the Pulumi resources and stack, delete the Kind cluster,' \
-    '            remove the local Pulumi backend, and remove echo-server images.' \
+    '  --delete  Destroy the Pulumi resources and stack, restore the previous Pulumi' \
+    '            image configuration, delete the Kind cluster and backend, and remove' \
+    '            echo-server images.' \
     '  --help    Show this help message.'
 }
 
@@ -57,33 +58,6 @@ function stop_port_forward() {
   then
     rm -- "${port_forward_log}"
   fi
-}
-
-function restore_image_config() {
-  if [[ "${image_config_modified}" != true ]];
-  then
-    return
-  fi
-
-  if [[ -n "${previous_image}" ]];
-  then
-    if ! pulumi -C "${repository_root}/infra" config set image "${previous_image}" --stack "${stack_name}" >/dev/null;
-    then
-      printf 'Warning: could not restore the Pulumi image config to %s.\n' "${previous_image}" >&2
-    fi
-  else
-    if ! pulumi -C "${repository_root}/infra" config rm image --stack "${stack_name}" >/dev/null;
-    then
-      printf 'Warning: could not remove the Pulumi image config override.\n' >&2
-    fi
-  fi
-
-  image_config_modified=false
-}
-
-function cleanup() {
-  stop_port_forward
-  restore_image_config
 }
 
 function delete_environment() {
@@ -127,6 +101,11 @@ function delete_environment() {
         --remove-backups
     else
       printf 'Pulumi stack %s does not exist; skipping stack deletion.\n' "${stack_name}"
+    fi
+
+    if [[ -f "${stack_config_backup}" ]];
+    then
+      cp -- "${stack_config_backup}" "${stack_config_file}"
     fi
 
     pulumi logout "${backend_url}"
@@ -188,7 +167,7 @@ function create_and_test_environment() {
 
   bash "${repository_root}/scripts/check-requirements.sh"
   export PULUMI_CONFIG_PASSPHRASE="${PULUMI_CONFIG_PASSPHRASE:-local-ci-only}"
-  trap cleanup EXIT
+  trap stop_port_forward EXIT
 
   image_ref="echo-server:e2e-$(date +%Y%m%d%H%M%S)"
 
@@ -218,9 +197,11 @@ function create_and_test_environment() {
   mkdir -p "${backend_directory}"
   pulumi login "${backend_url}"
   pulumi -C "${repository_root}/infra" stack select "${stack_name}" --create
-  previous_image="$(pulumi -C "${repository_root}/infra" config get image --stack "${stack_name}" 2>/dev/null || true)"
+  if [[ ! -f "${stack_config_backup}" ]];
+  then
+    cp -- "${stack_config_file}" "${stack_config_backup}"
+  fi
   pulumi -C "${repository_root}/infra" config set image "${image_ref}" --stack "${stack_name}" >/dev/null
-  image_config_modified=true
   pulumi -C "${repository_root}/infra" config --stack "${stack_name}"
   pulumi -C "${repository_root}/infra" preview --diff --stack "${stack_name}"
   pulumi -C "${repository_root}/infra" up --yes --stack "${stack_name}"
