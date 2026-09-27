@@ -32,7 +32,7 @@ test: fmt-check vet $(GO_FILES) $(GO_MODULE_FILES) ## Run formatting, vet, race,
 test-e2e: $(E2E_FILES) ## Run the local end-to-end test; pass E2E_ARGS=--delete to clean up.
 	bash scripts/local-e2e.sh $(E2E_ARGS)
 
-check-requirements: scripts/check-requirements.sh ## Validate required tools, versions, and Docker access.
+check-requirements: scripts/check-requirements.sh ## Report missing or outdated tools and Docker access (non-fatal).
 	bash scripts/check-requirements.sh
 
 build-echo-server: $(ECHO_SERVER_GO_FILES) go.mod ## Build the application at build/echo-server.

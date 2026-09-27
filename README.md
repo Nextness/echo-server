@@ -66,7 +66,7 @@ Every normal request path is handled. A successful request returns `200 OK` and 
 
 ```bash
 make help               # list all available Make commands
-make check-requirements # check requirements to build and run this project
+make check-requirements # report missing or outdated prerequisites (does not fail)
 make test               # runs all formatting checks, vet checks, race-enabled unit tests, and Pulumi tests
 make test-e2e           # deploys locally and validates the response through Kubernetes, optionally add E2E_ARGS=--delete
                         #   to delete the resources created in the e2e test

@@ -20,7 +20,7 @@ Install these tools before starting:
 
 ### Tested versions
 
-The following table lists the versions used to run the complete project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`. This command checks Bash, GNU Make, Go, the Docker CLI, Buildx and daemon, Kind, kubectl, Pulumi, Git, curl, and jq. It prints every missing, outdated, or unusable requirement and exits with a non-zero status if any check fails. Installed command-line tool versions may be equal to or newer than the corresponding versions in the table below.
+The following table lists the versions used to run the complete project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`. This command checks Bash, GNU Make, Go, the Docker CLI, Buildx and daemon, Kind, kubectl, Pulumi, Git, curl, and jq. It prints every missing, outdated, or unusable requirement and warns when the project may not work as intended; it always exits successfully, so review its output before continuing. Installed command-line tool versions may be equal to or newer than the corresponding versions in the table below.
 
 If you don't have `make` installed in your system, you can use bash directly with the following command `bash scripts/check-requirements.sh`.
 
