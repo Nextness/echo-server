@@ -20,32 +20,37 @@ Install these tools before starting:
 
 ### Tested versions
 
-The following table lists the versions used to run the complete project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`. This command checks Bash, GNU Make, Go, the Docker CLI, Buildx and daemon, Kind, kubectl, Pulumi, Git, curl, and jq. It prints every missing, outdated, or unusable requirement and warns when the project may not work as intended; it always exits successfully, so review its output before continuing. Installed command-line tool versions may be equal to or newer than the corresponding versions in the table below.
+The following table lists the versions used to run the complete project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`.
+
+`make check-requirements` prints every missing, outdated, or unusable requirement and warns when the project may not work as intended. It always exits successfully, so review its output before continuing.
 
 If you don't have `make` installed in your system, you can use bash directly with the following command `bash scripts/check-requirements.sh`.
 
-| Component                      | Version    |
-| ------------------------------ | ---------- |
-| Bash                           | `5.3.15`   |
-| GNU Make                       | `4.4.1`    |
-| Go                             | `1.27.1`   |
-| Docker Engine                  | `29.8.1`   |
-| Docker Buildx                  | `v0.37.1`  |
-| Kind                           | `v0.33.0`  |
-| Kubernetes node                | `v1.37.0`  |
-| kubectl                        | `v1.37.1`  |
-| Pulumi CLI                     | `3.265.0`  |
-| Pulumi Go SDK                  | `v3.265.0` |
-| Pulumi Kubernetes SDK/provider | `v4.34.2`  |
-| Git                            | `2.55.0`   |
-| curl                           | `8.21.0`   |
+| Component                      | User Version |
+| ------------------------------ | ------------ |
+| Bash                           | `5.3.15`     |
+| GNU Make                       | `4.4.1`      |
+| Go                             | `1.27.1`     |
+| Docker Engine                  | `29.8.1`     |
+| Docker Buildx                  | `v0.37.1`    |
+| Kind                           | `v0.33.0`    |
+| Kubernetes node                | `v1.37.0`    |
+| kubectl                        | `v1.37.1`    |
+| Pulumi CLI                     | `3.265.0`    |
+| Pulumi Go SDK                  | `v3.265.0`   |
+| Pulumi Kubernetes SDK/provider | `v4.34.2`    |
+| Git                            | `2.55.0`     |
+| curl                           | `8.21.0`     |
 | jq                             | `1.8.2`    |
 
 **Note**: The Kubernetes node image is pinned to: `kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5`. Kind `v0.33.0` does not publish a `v1.37.1` node image, so the node stays on `v1.37.0` while `kubectl v1.37.1` remains within the supported one-minor version skew.
 
-**Note**: Kind must be able to use Docker as the current user. If the script reports permission denied for `/var/run/docker.sock`, configure non-root Docker access and start a new login session before continuing. Avoid mixing `sudo docker` with non-sudo Kind and kubectl commands because that can create resources and configuration under different users.
+**Note**: Kind must be able to use Docker as the current user. If the script reports permission denied for `/var/run/docker.sock`, configure non-root Docker access and start a new login session before continuing.
+
+**Note**: Avoid mixing `sudo docker` with non-sudo Kind and kubectl commands because that can create resources and configuration under different users.
 
 <details>
+
 <summary>Optional local checks</summary>
 
 You may run formatting checks, vet, and all tests with race detection and coverage to make sure the project is up to date. Alternatively, you may run only the formatting check.
@@ -55,6 +60,7 @@ make test
 # or
 make fmt-check
 ```
+
 </details>
 
 ## 1. Create the Kind cluster
@@ -68,12 +74,14 @@ kind create cluster \
 ```
 
 <details>
+
 <summary>The arguments have these effects</summary>
 
 - `kind create cluster` runs Kubernetes nodes as Docker containers;
 - `--name echo` names the cluster and creates the kubeconfig context `kind-echo`;
 - `--image` selects Kubernetes `v1.37.0` instead of a floating Kind default;
 - The digest pins the exact node-image contents for reproducibility.
+
 </details>
 
 Once we create the cluster, we can verify the cluster and kubeconfig:
@@ -88,6 +96,7 @@ kubectl --context kind-echo get nodes -o wide
 ```
 
 <details>
+
 <summary>Expected results</summary>
 
 - `kind get clusters` includes `echo`.
@@ -96,6 +105,7 @@ kubectl --context kind-echo get nodes -o wide
 - The control-plane node is reported as `Ready`.
 
 The wait command may return immediately when the node is already ready as it waits for a condition, not for a fixed duration.
+
 </details>
 
 ## 2. Build and load the application image
@@ -113,6 +123,7 @@ docker image inspect echo-server:local
 ```
 
 <details>
+
 <summary>Optionally, run the image locally in a dedicated terminal</summary>
 
 ```bash
@@ -131,6 +142,7 @@ curl --fail-with-body \
 ```
 
 Press `Ctrl+C` in the first terminal to stop and remove the standalone container before continuing.
+
 </details>
 
 The image must be loaded before deployment because the Kubernetes container uses `imagePullPolicy: Never`. Kubernetes will not download it from a registry.
@@ -179,6 +191,7 @@ pulumi -C infra config --stack local
 ```
 
 <details>
+
 <summary>The expected values are</summary>
 
 ```text
@@ -186,6 +199,7 @@ kubernetes:context   kind-echo
 echo-infra:image     echo-server:local
 echo-infra:replicas  1
 ```
+
 </details>
 
 Preview the changes before applying them:
@@ -227,12 +241,14 @@ kubectl --context kind-echo logs deployment/echo-server
 ```
 
 <details>
+
 <summary>The expected configuration is</summary>
 
 - Deployment and Service named `echo-server`.
 - One ready replica by default.
 - ClusterIP Service port `80` targeting the named container port `http` on `8080`.
 - Container image matching the value configured in Pulumi.
+
 </details>
 
 ## 6. Access and test the service
