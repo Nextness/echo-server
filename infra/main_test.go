@@ -224,6 +224,18 @@ func TestRunRejectsInvalidReplicaConfiguration(t *testing.T) {
 	}
 }
 
+func TestPortForwardCommandIncludesContext(t *testing.T) {
+	expectedWithContext := "kubectl --context kind-echo port-forward service/echo-server 8080:80"
+	if got := portForwardCommand("kind-echo", "echo-server"); got != expectedWithContext {
+		t.Errorf("Got port-forward command = %q, but expected %q", got, expectedWithContext)
+	}
+
+	expectedWithoutContext := "kubectl port-forward service/echo-server 8080:80"
+	if got := portForwardCommand("", "echo-server"); got != expectedWithoutContext {
+		t.Errorf("Got port-forward command = %q, but expected %q", got, expectedWithoutContext)
+	}
+}
+
 func assertProbe(t *testing.T, container map[string]any, key, expectedPath string) {
 	t.Helper()
 

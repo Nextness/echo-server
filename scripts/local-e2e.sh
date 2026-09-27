@@ -7,10 +7,10 @@ repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly cluster_name="echo"
 readonly kube_context="kind-${cluster_name}"
 readonly node_image="kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
-readonly image_ref="echo-server:local"
 readonly stack_name="local"
 readonly backend_directory="${repository_root}/.pulumi-state"
 readonly backend_url="file://${backend_directory}"
+readonly previous_image_file="${backend_directory}/previous-image"
 readonly local_port="18080"
 
 port_forward_pid=""
@@ -20,11 +20,12 @@ function usage() {
   printf '%s\n' \
     'Usage: scripts/local-e2e.sh [--delete]' \
     '' \
-    'Without arguments, create the local Kind environment, deploy the application,' \
-    'and verify its response contract.' \
+    'Without arguments, create the local Kind environment, build and deploy a uniquely' \
+    'tagged application image, and verify its response contract.' \
     '' \
-    '  --delete  Destroy the Pulumi resources and stack, delete the Kind cluster,' \
-    '            remove the local Pulumi backend, and remove echo-server images.' \
+    '  --delete  Destroy the Pulumi resources and stack, restore the previous Pulumi' \
+    '            image setting, delete the Kind cluster and backend, and remove' \
+    '            echo-server images.' \
     '  --help    Show this help message.'
 }
 
@@ -58,17 +59,51 @@ function stop_port_forward() {
   fi
 }
 
+function restore_previous_image() {
+  if [[ ! -f "${previous_image_file}" ]];
+  then
+    return
+  fi
+
+  if [[ -s "${previous_image_file}" ]];
+  then
+    if ! pulumi -C "${repository_root}/infra" config set image "$(<"${previous_image_file}")" --stack "${stack_name}" >/dev/null;
+    then
+      printf 'Warning: could not restore the previous Pulumi image setting.\n' >&2
+    fi
+  else
+    if ! pulumi -C "${repository_root}/infra" config rm image --stack "${stack_name}" >/dev/null;
+    then
+      printf 'Warning: could not remove the Pulumi image setting override.\n' >&2
+    fi
+  fi
+}
+
 function delete_environment() {
   local -a project_image_refs
+  local stack_list
 
-  require_commands docker kind kubectl pulumi
+  require_commands docker jq kind kubectl pulumi
   export PULUMI_CONFIG_PASSPHRASE="${PULUMI_CONFIG_PASSPHRASE:-local-ci-only}"
 
   if [[ -d "${backend_directory}" ]];
   then
     pulumi login "${backend_url}"
 
-    if pulumi -C "${repository_root}/infra" stack select "${stack_name}" >/dev/null 2>&1;
+    if ! stack_list="$(pulumi -C "${repository_root}/infra" stack ls --json)";
+    then
+      printf 'Cannot list Pulumi stacks in %s; aborting cleanup without deleting resources.\n' \
+        "${backend_url}" >&2
+      exit 1
+    fi
+
+    if ! jq -e 'type == "array"' <<<"${stack_list}" >/dev/null;
+    then
+      printf 'Cannot parse the Pulumi stack list; aborting cleanup without deleting resources.\n' >&2
+      exit 1
+    fi
+
+    if jq -e --arg name "${stack_name}" 'any(.[]; .name == $name)' <<<"${stack_list}" >/dev/null;
     then
       if ! cluster_exists;
       then
@@ -79,6 +114,7 @@ function delete_environment() {
       fi
 
       pulumi -C "${repository_root}/infra" destroy --yes --stack "${stack_name}"
+      restore_previous_image
       pulumi -C "${repository_root}/infra" stack rm "${stack_name}" \
         --yes \
         --preserve-config \
@@ -142,10 +178,13 @@ function wait_for_port_forward() {
 }
 
 function create_and_test_environment() {
-  local response
+  local deployed_image image_ref previous_image response
 
   bash "${repository_root}/scripts/check-requirements.sh"
   export PULUMI_CONFIG_PASSPHRASE="${PULUMI_CONFIG_PASSPHRASE:-local-ci-only}"
+  trap stop_port_forward EXIT
+
+  image_ref="echo-server:e2e-$(date +%Y%m%d%H%M%S)"
 
   if cluster_exists;
   then
@@ -164,6 +203,7 @@ function create_and_test_environment() {
     --timeout=120s
   kubectl --context "${kube_context}" get nodes -o wide
 
+  printf 'Building and loading %s.\n' "${image_ref}"
   docker buildx build --load --tag "${image_ref}" "${repository_root}"
   docker image inspect "${image_ref}" >/dev/null
   kind load docker-image "${image_ref}" --name "${cluster_name}"
@@ -172,6 +212,12 @@ function create_and_test_environment() {
   mkdir -p "${backend_directory}"
   pulumi login "${backend_url}"
   pulumi -C "${repository_root}/infra" stack select "${stack_name}" --create
+  if [[ ! -f "${previous_image_file}" ]];
+  then
+    previous_image="$(pulumi -C "${repository_root}/infra" config get image --stack "${stack_name}" 2>/dev/null || true)"
+    printf '%s' "${previous_image}" >"${previous_image_file}"
+  fi
+  pulumi -C "${repository_root}/infra" config set image "${image_ref}" --stack "${stack_name}" >/dev/null
   pulumi -C "${repository_root}/infra" config --stack "${stack_name}"
   pulumi -C "${repository_root}/infra" preview --diff --stack "${stack_name}"
   pulumi -C "${repository_root}/infra" up --yes --stack "${stack_name}"
@@ -180,10 +226,17 @@ function create_and_test_environment() {
     deployment/echo-server \
     --timeout=120s
   kubectl --context "${kube_context}" wait \
-    --for=condition=Ready \
-    pod \
-    --selector app.kubernetes.io/name=echo-server \
+    --for=condition=Available \
+    deployment/echo-server \
     --timeout=120s
+  deployed_image="$(kubectl --context "${kube_context}" get deployment/echo-server -o jsonpath='{.spec.template.spec.containers[0].image}')"
+  if [[ "${deployed_image}" != "${image_ref}" ]];
+  then
+    printf 'Deployment is running image %s, but expected %s.\n' \
+      "${deployed_image}" \
+      "${image_ref}" >&2
+    exit 1
+  fi
   kubectl --context "${kube_context}" get deployment,service,pod -o wide
   kubectl --context "${kube_context}" logs deployment/echo-server
 
@@ -193,7 +246,6 @@ function create_and_test_environment() {
     "${local_port}:80" \
     >"${port_forward_log}" 2>&1 &
   port_forward_pid=$!
-  trap stop_port_forward EXIT
 
   wait_for_port_forward
 

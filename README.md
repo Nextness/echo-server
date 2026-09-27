@@ -6,13 +6,21 @@ The application is packaged as a minimal non-root container and deployed to a lo
 
 ## Architecture
 
+The Pod is reached in two different ways depending on where the client runs:
+
 ```text
-HTTP client
-  -> kubectl port-forward
+Client outside the cluster (local development and CI)
+  -> kubectl port-forward (resolves the Service to a Pod, tunnels directly)
+  -> Deployment Pod :8080
+  -> stateless Go http.Handler
+
+Client inside the cluster (other Pods)
   -> ClusterIP Service :80
   -> Deployment Pod :8080
   -> stateless Go http.Handler
 ```
+
+The current automated checks run outside the cluster and use port forwarding, so they do not exercise ClusterIP routing.
 
 Repository structure:
 
@@ -45,8 +53,10 @@ Every normal request path is handled. A successful request returns `200 OK` and 
 
 - Header and query-parameter values are arrays so repeated values are preserved;
 - `Host` is included even though Go stores it separately from `Request.Header`;
-- `body` is a string containing the original payload; JSON input is not parsed and reserialized;
+- `body` is a string containing the payload as UTF-8 text; JSON input is not parsed and reserialized. Invalid UTF-8 bytes are replaced with the Unicode replacement character (U+FFFD), so binary payloads are not preserved byte-for-byte;
 - `path` excludes the query string because query parameters are returned separately;
+- `OPTIONS *` reaches the echo handler because the server's automatic general OPTIONS response is disabled, so it returns the same JSON envelope with `path` set to `*`;
+- `HEAD` is answered by the same handler, but HTTP requires an empty response body, so only the status and headers are returned;
 - Go canonicalizes header names, so a header such as `X-CI` is normally returned as `X-Ci`;
 - Request bodies are bounded by `MAX_BODY_BYTES`;
 - An oversized body returns `413 Request Entity Too Large`;
@@ -66,9 +76,9 @@ Every normal request path is handled. A successful request returns `200 OK` and 
 
 ```bash
 make help               # list all available Make commands
-make check-requirements # check requirements to build and run this project
+make check-requirements # report missing or outdated prerequisites (does not fail)
 make test               # runs all formatting checks, vet checks, race-enabled unit tests, and Pulumi tests
-make test-e2e           # deploys locally and validates the response through Kubernetes, optionally add E2E_ARGS=--delete
+make test-e2e           # deploys locally and validates the response through kubectl port-forward, optionally add E2E_ARGS=--delete
                         #   to delete the resources created in the e2e test
 make build-echo-server  # builds a local executable at build/echo-server
 make run-infra          # applies the infrastructure; requires the Kind cluster described in SETUP.md
@@ -108,9 +118,9 @@ The image uses `imagePullPolicy: Never` because it is copied directly into Kind 
 - Server tests cover invalid configuration, listener errors, and graceful cancellation;
 - Pulumi mock tests validate configuration, labels, image settings, ports, probes, security settings, and the Service contract;
 - `go test -race` checks application code for data races;
-- GitHub Actions deploys the image to a real Kind cluster (which is ephemeral by design) and validates the response contract through the Kubernetes Service.
+- GitHub Actions deploys the image to a real Kind cluster (which is ephemeral by design) and validates the response contract through `kubectl port-forward`, which resolves the Service to a Pod.
 
-Pull requests run a Pulumi preview. Pushes to `main` apply the infrastructure to the ephemeral Kind cluster and run the smoke test.
+CI runs on pushes to `main` and when pull requests targeting `main` are opened, updated, or reopened. Each run tests, builds, and loads the image into Kind. Pull requests run a Pulumi preview; pushes to `main` deploy and smoke-test the application.
 
 ## Deliberate tradeoffs
 

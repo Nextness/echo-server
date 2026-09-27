@@ -23,9 +23,20 @@ func run(ctx *pulumi.Context) error {
 		return err
 	}
 
+	kubernetesContext := config.New(ctx, "kubernetes").Get("context")
+
 	ctx.Export("serviceName", service.Metadata.Name())
-	ctx.Export("portForward", pulumi.Sprintf("kubectl port-forward service/%s 8080:80", service.Metadata.Name()))
+	ctx.Export("portForward", pulumi.String(portForwardCommand(kubernetesContext, appName)))
 	return nil
+}
+
+// portForwardCommand returns the kubectl command that reaches the Service from
+// the local machine, pinned to the configured Kubernetes context.
+func portForwardCommand(kubernetesContext, serviceName string) string {
+	if kubernetesContext == "" {
+		return fmt.Sprintf("kubectl port-forward service/%s 8080:80", serviceName)
+	}
+	return fmt.Sprintf("kubectl --context %s port-forward service/%s 8080:80", kubernetesContext, serviceName)
 }
 
 func loadAppArgs(ctx *pulumi.Context) (AppArgs, error) {

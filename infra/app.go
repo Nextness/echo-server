@@ -9,8 +9,12 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
-// containerPort is the port the Echo Server container listens on.
-const containerPort = 8080
+const (
+	// appName is the name shared by the Echo Server Kubernetes resources.
+	appName = "echo-server"
+	// containerPort is the port the Echo Server container listens on.
+	containerPort = 8080
+)
 
 // AppArgs configures the Echo Server deployment.
 type AppArgs struct {
@@ -21,12 +25,12 @@ type AppArgs struct {
 // deployEcho creates the Echo Server Deployment and ClusterIP Service.
 func deployEcho(ctx *pulumi.Context, args AppArgs) (*corev1.Service, error) {
 	labels := pulumi.StringMap{
-		"app.kubernetes.io/name": pulumi.String("echo-server"),
+		"app.kubernetes.io/name": pulumi.String(appName),
 	}
 
-	deployment, err := appsv1.NewDeployment(ctx, "echo-server", &appsv1.DeploymentArgs{
+	deployment, err := appsv1.NewDeployment(ctx, appName, &appsv1.DeploymentArgs{
 		Metadata: &metav1.ObjectMetaArgs{
-			Name:   pulumi.String("echo-server"),
+			Name:   pulumi.String(appName),
 			Labels: labels,
 		},
 		Spec: appsv1.DeploymentSpecArgs{
@@ -91,9 +95,9 @@ func deployEcho(ctx *pulumi.Context, args AppArgs) (*corev1.Service, error) {
 		return nil, err
 	}
 
-	service, err := corev1.NewService(ctx, "echo-server", &corev1.ServiceArgs{
+	service, err := corev1.NewService(ctx, appName, &corev1.ServiceArgs{
 		Metadata: &metav1.ObjectMetaArgs{
-			Name:   pulumi.String("echo-server"),
+			Name:   pulumi.String(appName),
 			Labels: labels,
 		},
 		Spec: corev1.ServiceSpecArgs{

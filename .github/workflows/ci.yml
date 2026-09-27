@@ -33,6 +33,7 @@ jobs:
       KIND_CLUSTER_NAME: echo
       IMAGE_REF: echo-server:${{ github.sha }}
       PULUMI_BACKEND_URL: file://${{ github.workspace }}/.pulumi-state
+      PULUMI_CONFIG_PASSPHRASE: local-ci-only
 
     steps:
       - name: Check out repository
@@ -46,7 +47,7 @@ jobs:
           cache-dependency-path: infra/go.sum
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.3.0
+        uses: docker/setup-buildx-action@v4.4.1
         with:
           version: v0.37.1
 
@@ -55,31 +56,19 @@ jobs:
         with:
           cluster_name: echo
           version: v0.33.0
-          kubectl_version: v1.37.0
+          kubectl_version: v1.37.1
           node_image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
           wait: 120s
 
       - name: Install Pulumi
-        uses: pulumi/actions@v7
+        uses: pulumi/actions@v7.0.0
         with:
           pulumi-version: 3.265.0
 
       - name: Test, build, and load image
         run: bash ./scripts/ci.sh
 
-      - name: Check Pulumi passphrase secret is available
-        env:
-          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
-        run: |
-          if [[ -z "${PULUMI_CONFIG_PASSPHRASE}" ]];
-          then
-            echo "PULUMI_CONFIG_PASSPHRASE repository secret is not configured or is unavailable" >&2
-            exit 1
-          fi
-
       - name: Initialize local Pulumi stack
-        env:
-          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
         run: |
           mkdir -p "${{ github.workspace }}/.pulumi-state"
           pulumi login "${PULUMI_BACKEND_URL}"
@@ -88,14 +77,10 @@ jobs:
 
       - name: Preview infrastructure
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.operation == 'preview')
-        env:
-          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
         run: pulumi -C infra preview --diff --non-interactive --stack local
 
       - name: Deploy infrastructure
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'apply')
-        env:
-          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
         run: pulumi -C infra up --yes --non-interactive --stack local
 
       - name: Wait for application
@@ -113,7 +98,7 @@ jobs:
           trap 'kill "${port_forward_pid}" 2>/dev/null || true' EXIT
 
           ready=false
-          for attempt in {1..20};
+          for _ in {1..20};
           do
             if curl --silent --fail http://127.0.0.1:18080/readyz >/dev/null;
             then

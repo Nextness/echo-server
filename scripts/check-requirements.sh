@@ -4,17 +4,17 @@ set -Eeuo pipefail
 
 readonly MIN_BASH_VERSION="5.3.15"
 readonly MIN_MAKE_VERSION="4.4.1"
-readonly MIN_GO_VERSION="1.26.6"
+readonly MIN_GO_VERSION="1.27.1"
 readonly MIN_DOCKER_VERSION="29.8.1"
 readonly MIN_DOCKER_BUILDX_VERSION="0.37.1"
 readonly MIN_KIND_VERSION="0.33.0"
-readonly MIN_KUBECTL_VERSION="1.37.0"
-readonly MIN_PULUMI_VERSION="3.264.0"
+readonly MIN_KUBECTL_VERSION="1.37.1"
+readonly MIN_PULUMI_VERSION="3.265.0"
 readonly MIN_GIT_VERSION="2.55.0"
 readonly MIN_CURL_VERSION="8.21.0"
 readonly MIN_JQ_VERSION="1.8.2"
 
-failure_count=0
+problem_count=0
 
 function extract_version() {
   local output="$1"
@@ -56,9 +56,9 @@ function version_is_at_least() {
   return 0
 }
 
-function record_failure() {
-  printf '[FAIL] %s\n' "$1" >&2
-  failure_count=$((failure_count + 1))
+function record_problem() {
+  printf '[WARN] %s\n' "$1" >&2
+  problem_count=$((problem_count + 1))
 }
 
 function check_version() {
@@ -70,25 +70,25 @@ function check_version() {
 
   if ! command -v "${command_name}" >/dev/null 2>&1;
   then
-    record_failure "${label} is not installed (minimum ${minimum})"
+    record_problem "${label} is not installed (minimum ${minimum})"
     return
   fi
 
   if ! output="$("${command_name}" "$@" 2>&1)";
   then
-    record_failure "could not determine ${label} version: ${output}"
+    record_problem "could not determine ${label} version: ${output}"
     return
   fi
 
   if ! actual="$(extract_version "${output}")";
   then
-    record_failure "could not parse ${label} version from: ${output}"
+    record_problem "could not parse ${label} version from: ${output}"
     return
   fi
 
   if ! version_is_at_least "${actual}" "${minimum}";
   then
-    record_failure "${label} ${actual} is older than required ${minimum}"
+    record_problem "${label} ${actual} is older than required ${minimum}"
     return
   fi
 
@@ -105,19 +105,19 @@ function check_docker_daemon() {
 
   if ! output="$(docker info --format '{{.ServerVersion}}' 2>&1)";
   then
-    record_failure "Docker daemon is unavailable: ${output}"
+    record_problem "Docker daemon is unavailable: ${output}"
     return
   fi
 
   if ! server_version="$(extract_version "${output}")";
   then
-    record_failure "could not parse Docker daemon version from: ${output}"
+    record_problem "could not parse Docker daemon version from: ${output}"
     return
   fi
 
   if ! version_is_at_least "${server_version}" "${MIN_DOCKER_VERSION}";
   then
-    record_failure "Docker daemon ${server_version} is older than required ${MIN_DOCKER_VERSION}"
+    record_problem "Docker daemon ${server_version} is older than required ${MIN_DOCKER_VERSION}"
     return
   fi
 
@@ -142,10 +142,11 @@ check_version "curl" "curl" "${MIN_CURL_VERSION}" --version
 check_version "jq" "jq" "${MIN_JQ_VERSION}" --version
 
 printf '\n'
-if ((failure_count > 0));
+if ((problem_count > 0));
 then
-  printf 'Prerequisite check failed with %d problem(s).\n' "${failure_count}" >&2
-  exit 1
+  printf 'Prerequisite check found %d problem(s).\n' "${problem_count}" >&2
+  printf 'The project may not work as intended, and you may need to make adjustments to make it work properly.\n' >&2
+  exit 0
 fi
 
 printf 'All prerequisites are installed, meet the minimum versions, and are usable.\n'

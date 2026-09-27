@@ -20,7 +20,7 @@ Install these tools before starting:
 
 ### Tested versions
 
-The following table lists the versions used to run the complete project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`. This command checks Bash, GNU Make, Go, the Docker CLI, Buildx and daemon, Kind, kubectl, Pulumi, Git, curl, and jq. It prints every missing, outdated, or unusable requirement and exits with a non-zero status if any check fails. Installed command-line tool versions may be equal to or newer than the corresponding versions in the table below.
+The following table lists the versions used to run the complete project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`. This command checks Bash, GNU Make, Go, the Docker CLI, Buildx and daemon, Kind, kubectl, Pulumi, Git, curl, and jq. It prints every missing, outdated, or unusable requirement and warns when the project may not work as intended; it always exits successfully, so review its output before continuing. Installed command-line tool versions may be equal to or newer than the corresponding versions in the table below.
 
 If you don't have `make` installed in your system, you can use bash directly with the following command `bash scripts/check-requirements.sh`.
 
@@ -28,20 +28,20 @@ If you don't have `make` installed in your system, you can use bash directly wit
 | ------------------------------ | ---------- |
 | Bash                           | `5.3.15`   |
 | GNU Make                       | `4.4.1`    |
-| Go                             | `1.26.6`   |
+| Go                             | `1.27.1`   |
 | Docker Engine                  | `29.8.1`   |
 | Docker Buildx                  | `v0.37.1`  |
 | Kind                           | `v0.33.0`  |
 | Kubernetes node                | `v1.37.0`  |
-| kubectl                        | `v1.37.0`  |
-| Pulumi CLI                     | `3.264.0`  |
+| kubectl                        | `v1.37.1`  |
+| Pulumi CLI                     | `3.265.0`  |
 | Pulumi Go SDK                  | `v3.265.0` |
 | Pulumi Kubernetes SDK/provider | `v4.34.2`  |
 | Git                            | `2.55.0`   |
 | curl                           | `8.21.0`   |
 | jq                             | `1.8.2`    |
 
-**Note**: The Kubernetes node image is pinned to: `kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5`
+**Note**: The Kubernetes node image is pinned to: `kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5`. Kind `v0.33.0` does not publish a `v1.37.1` node image, so the node stays on `v1.37.0` while `kubectl v1.37.1` remains within the supported one-minor version skew.
 
 **Note**: Kind must be able to use Docker as the current user. If the script reports permission denied for `/var/run/docker.sock`, configure non-root Docker access and start a new login session before continuing. Avoid mixing `sudo docker` with non-sudo Kind and kubectl commands because that can create resources and configuration under different users.
 
@@ -152,7 +152,7 @@ The backend is ignored by Git and does not require a Pulumi Cloud account.
 
 ### Passphrase
 
-Pulumi's local passphrase protects encrypted stack configuration. For this exercise, the committed local stack configuration was generated with the shared passphrase `local-ci-only` so that local development and ephemeral CI can use the same configuration. Enter it when Pulumi prompts for the passphrase.
+Pulumi's local passphrase protects encrypted stack configuration. For this exercise, the committed local stack configuration was generated with the shared passphrase `local-ci-only` so that local development and ephemeral CI can use the same configuration. Enter it when Pulumi prompts for the passphrase. The GitHub Actions workflow sets the same value directly as an environment variable, so no repository secret is required.
 
 The committed `encryptionsalt` in `infra/Pulumi.local.yaml` is not itself a password. Do not delete or edit it to rotate the passphrase for an existing stack. A production repository should use a unique, undisclosed passphrase and a supported Pulumi secrets-provider migration process.
 
@@ -194,7 +194,7 @@ The Make target reruns the prerequisite check and then executes `pulumi -C infra
 
 ## 5. Verify the deployment
 
-Wait for the Deployment rollout and Pod readiness:
+Wait for the Deployment rollout and availability:
 
 ```bash
 kubectl --context kind-echo rollout status \
@@ -202,8 +202,8 @@ kubectl --context kind-echo rollout status \
   --timeout=120s
 
 kubectl --context kind-echo wait \
-  --for=condition=Ready pod \
-  --selector app.kubernetes.io/name=echo-server \
+  --for=condition=Available \
+  deployment/echo-server \
   --timeout=120s
 ```
 
@@ -225,7 +225,7 @@ The expected configuration is:
 
 ## 6. Access and test the service
 
-The default Service is intentionally private to the cluster. In a dedicated terminal, forward local port `8080` to Service port `80`:
+The default Service is intentionally private to the cluster. In a dedicated terminal, use `kubectl port-forward` to resolve the Service to one of its Pods and tunnel local port `8080` directly to that Pod:
 
 ```bash
 kubectl --context kind-echo port-forward \
@@ -261,7 +261,7 @@ The response should contain these values, in addition to automatically supplied 
 }
 ```
 
-This request travels through the local port-forward, ClusterIP Service, and Deployment Pod. It therefore verifies more than a standalone handler or container test.
+This request travels through the local port-forward and directly to a Deployment Pod that the Service selected. It verifies the deployed Pod, the handler, and that the Service resolves to a ready endpoint, but it does not exercise ClusterIP routing or Service load balancing. Testing those would require an in-cluster client or the optional `NodePort` path below.
 
 If port `8080` is already occupied, change only the host side of the mapping:
 
@@ -333,33 +333,25 @@ node_ip="$(
 curl --fail-with-body "http://${node_ip}:30080/demo?tag=go&tag=kind" | jq
 ```
 
-The endpoint remains available while the Service and Kind cluster are running. This relies on the Linux host being able to route to the Docker bridge address used by the Kind node. Environments that cannot reach that address should continue using port forwarding. Binding specifically to `127.0.0.1` would still require a Kind host-port mapping outside the current Pulumi-managed Kubernetes resources. A real cloud environment would normally use an Ingress or `LoadBalancer` Service instead of this local NodePort arrangement.
+The endpoint remains available while the Service and Kind cluster are running. Unlike port forwarding, this path enters through the node and is routed by kube-proxy to the Service's ClusterIP, so it does exercise ClusterIP routing. This relies on the Linux host being able to route to the Docker bridge address used by the Kind node. Environments that cannot reach that address should continue using port forwarding. Binding specifically to `127.0.0.1` would still require a Kind host-port mapping outside the current Pulumi-managed Kubernetes resources. A real cloud environment would normally use an Ingress or `LoadBalancer` Service instead of this local NodePort arrangement.
 
 **Note**: This is a local-development convenience rather than the recommended approach. It avoids keeping a port-forward process running, but requires resolving the Kind node IP and **only works** when the host can route to the Docker bridge network.
 
 ## GitHub Actions
 
-The workflow creates a new Kind cluster and local Pulumi backend for each job:
+Every workflow run executes `scripts/ci.sh` to run tests, build the image, and load it into a new Kind cluster. Pulumi uses a local backend for that run. The trigger determines the remaining steps:
 
-- Pull requests run tests, build and load the image, and execute `pulumi preview`.
+- Opening, updating, or reopening a pull request targeting `main` runs `pulumi preview`.
 - Pushes to `main` run `pulumi up`, wait for the Deployment, and validate the response contract.
 - Manual runs can select either `preview` or `apply`.
 
+Pushing to a feature branch triggers CI only when it updates an open pull request targeting `main`. The workflow does not run automatically on every branch push.
+
 The CI environment and deployed service disappear when the runner is destroyed; this workflow is deployment validation, not a persistent environment.
 
-### Required repository secret
+### Passphrase in CI
 
-Create a repository Actions secret named `PULUMI_CONFIG_PASSPHRASE`. Its value must be the exercise passphrase documented above because it was used to generate the encryption salt in `infra/Pulumi.local.yaml`.
-
-Set it interactively with the GitHub CLI:
-
-```bash
-gh secret set PULUMI_CONFIG_PASSPHRASE
-```
-
-Alternatively, use **Repository Settings → Secrets and variables → Actions → New repository secret**.
-
-The workflow receives the passphrase through the GitHub secret rather than hardcoding it in the workflow or stack configuration. GitHub does not expose repository secrets to workflows triggered by pull requests from forks, so Pulumi preview cannot run for an untrusted fork with this workflow design.
+The workflow sets `PULUMI_CONFIG_PASSPHRASE` to the documented exercise passphrase directly instead of using a repository secret. The stack contains no encrypted values and the value is already public, so there is nothing to protect. No repository secret configuration is required, including for previews of pull requests from forks.
 
 ## Troubleshooting
 
@@ -396,7 +388,7 @@ pulumi login "file://${PWD}/.pulumi-state"
 
 ### Pulumi reports `incorrect passphrase`
 
-The supplied `PULUMI_CONFIG_PASSPHRASE`, or the value entered at the prompt, does not match the encryption salt in the selected stack configuration. Use the shared exercise passphrase documented in the Passphrase section. Do not replace the GitHub secret or edit `encryptionsalt` without deliberately migrating the stack's secrets provider.
+The supplied `PULUMI_CONFIG_PASSPHRASE`, or the value entered at the prompt, does not match the encryption salt in the selected stack configuration. Use the shared exercise passphrase documented in the Passphrase section. Do not edit `encryptionsalt` without deliberately migrating the stack's secrets provider.
 
 ### Pod reports `ErrImageNeverPull`
 
@@ -541,7 +533,7 @@ To automate the complete local workflow after installing the prerequisites, run:
 make test-e2e
 ```
 
-The script creates or reuses the `echo` Kind cluster, builds and loads the application image, deploys it with Pulumi, and validates the response contract through the Kubernetes Service.
+The script creates or reuses the `echo` Kind cluster, builds and loads the application image under a unique tag (for example, `echo-server:e2e-20260926213000`), configures Pulumi with that exact reference, deploys it, and validates the response contract through `kubectl port-forward` to a Pod selected by the Service. It also checks that the Deployment references the built tag, so rebuilding the same tag cannot make the smoke test pass against a stale Pod. The Pulumi image configuration is left pointing at the deployed tag while the environment exists, so a later `make run-infra` deploys the same image; `--delete` restores the previous image setting without touching the rest of the configuration.
 
 Remove the project environment with:
 

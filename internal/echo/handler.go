@@ -15,6 +15,10 @@ const DefaultMaxBodyBytes int64 = 1 << 20
 
 // Response is the JSON envelope returned for every request. Body is empty and
 // Error is set when the request body cannot be read.
+//
+// Body is treated as UTF-8 text. Invalid UTF-8 sequences are replaced with the
+// Unicode replacement character (U+FFFD), so binary payloads are not preserved
+// byte-for-byte.
 type Response struct {
 	Headers http.Header         `json:"headers"`
 	Params  map[string][]string `json:"params"`
