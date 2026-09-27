@@ -88,15 +88,29 @@ function cleanup() {
 
 function delete_environment() {
   local -a project_image_refs
+  local stack_list
 
-  require_commands docker kind kubectl pulumi
+  require_commands docker jq kind kubectl pulumi
   export PULUMI_CONFIG_PASSPHRASE="${PULUMI_CONFIG_PASSPHRASE:-local-ci-only}"
 
   if [[ -d "${backend_directory}" ]];
   then
     pulumi login "${backend_url}"
 
-    if pulumi -C "${repository_root}/infra" stack select "${stack_name}" >/dev/null 2>&1;
+    if ! stack_list="$(pulumi -C "${repository_root}/infra" stack ls --json)";
+    then
+      printf 'Cannot list Pulumi stacks in %s; aborting cleanup without deleting resources.\n' \
+        "${backend_url}" >&2
+      exit 1
+    fi
+
+    if ! jq -e 'type == "array"' <<<"${stack_list}" >/dev/null;
+    then
+      printf 'Cannot parse the Pulumi stack list; aborting cleanup without deleting resources.\n' >&2
+      exit 1
+    fi
+
+    if jq -e --arg name "${stack_name}" 'any(.[]; .name == $name)' <<<"${stack_list}" >/dev/null;
     then
       if ! cluster_exists;
       then
