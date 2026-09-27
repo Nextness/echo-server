@@ -55,6 +55,8 @@ Every normal request path is handled. A successful request returns `200 OK` and 
 - `Host` is included even though Go stores it separately from `Request.Header`;
 - `body` is a string containing the payload as UTF-8 text; JSON input is not parsed and reserialized. Invalid UTF-8 bytes are replaced with the Unicode replacement character (U+FFFD), so binary payloads are not preserved byte-for-byte;
 - `path` excludes the query string because query parameters are returned separately;
+- `OPTIONS *` reaches the echo handler because the server's automatic general OPTIONS response is disabled, so it returns the same JSON envelope with `path` set to `*`;
+- `HEAD` is answered by the same handler, but HTTP requires an empty response body, so only the status and headers are returned;
 - Go canonicalizes header names, so a header such as `X-CI` is normally returned as `X-Ci`;
 - Request bodies are bounded by `MAX_BODY_BYTES`;
 - An oversized body returns `413 Request Entity Too Large`;

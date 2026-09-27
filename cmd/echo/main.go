@@ -41,6 +41,9 @@ func run(ctx context.Context) error {
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
+		// Handle OPTIONS * with the echo handler instead of the server's
+		// automatic empty 200 response.
+		DisableGeneralOptionsHandler: true,
 	}
 
 	serverErrors := make(chan error, 1)
