@@ -1,6 +1,7 @@
 package echo
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -143,6 +144,28 @@ func TestHandlerAcceptsBodyAtLimit(t *testing.T) {
 	}
 	response := decodeResponse(t, recorder)
 	expectedBody := "1234"
+	if response.Body != expectedBody {
+		t.Errorf("Got Body = %q, but expected %q", response.Body, expectedBody)
+	}
+}
+
+func TestHandlerReplacesInvalidUTF8Body(t *testing.T) {
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/binary",
+		bytes.NewReader([]byte{'o', 'l', 0xc3, 0xa1, ',', ' ', 0xff, 0xfe}),
+	)
+	recorder := httptest.NewRecorder()
+
+	newTestHandler(t, DefaultMaxBodyBytes).ServeHTTP(recorder, request)
+
+	expectedStatus := http.StatusOK
+	if recorder.Code != expectedStatus {
+		t.Fatalf("Got status = %d, but expected %d", recorder.Code, expectedStatus)
+	}
+
+	response := decodeResponse(t, recorder)
+	expectedBody := "olá, \ufffd\ufffd"
 	if response.Body != expectedBody {
 		t.Errorf("Got Body = %q, but expected %q", response.Body, expectedBody)
 	}

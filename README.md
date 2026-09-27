@@ -53,7 +53,7 @@ Every normal request path is handled. A successful request returns `200 OK` and 
 
 - Header and query-parameter values are arrays so repeated values are preserved;
 - `Host` is included even though Go stores it separately from `Request.Header`;
-- `body` is a string containing the original payload; JSON input is not parsed and reserialized;
+- `body` is a string containing the payload as UTF-8 text; JSON input is not parsed and reserialized. Invalid UTF-8 bytes are replaced with the Unicode replacement character (U+FFFD), so binary payloads are not preserved byte-for-byte;
 - `path` excludes the query string because query parameters are returned separately;
 - Go canonicalizes header names, so a header such as `X-CI` is normally returned as `X-Ci`;
 - Request bodies are bounded by `MAX_BODY_BYTES`;
