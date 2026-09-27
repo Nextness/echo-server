@@ -32,10 +32,11 @@ If the Deployment already uses `echo-server:local`, follow the [restart instruct
 Every workflow run executes `scripts/ci.sh` to run tests, build the image, and load it into a new Kind cluster. Pulumi uses a local backend for that run. The trigger determines the remaining steps:
 
 - Opening, updating, or reopening a pull request targeting `main` runs `pulumi preview`.
+- Pushes outside `main` run `pulumi preview`.
 - Pushes to `main` run `pulumi up`, wait for the Deployment, and validate the response contract.
 - Manual runs can select either `preview` or `apply`.
 
-Pushing to a feature branch triggers CI only when it updates an open pull request targeting `main`. The workflow does not run automatically on every branch push.
+Every push triggers CI, including feature branches without an open pull request.
 
 The CI environment and deployed service disappear when the runner is destroyed; this workflow is deployment validation, not a persistent environment.
 

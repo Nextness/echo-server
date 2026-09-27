@@ -2,8 +2,6 @@ name: echo-server-ci
 
 on:
   push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
@@ -76,7 +74,7 @@ jobs:
           pulumi -C infra config set image "${IMAGE_REF}" --stack local
 
       - name: Preview infrastructure
-        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.operation == 'preview')
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'preview')
         run: pulumi -C infra preview --diff --non-interactive --stack local
 
       - name: Deploy infrastructure
