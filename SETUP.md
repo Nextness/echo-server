@@ -28,20 +28,20 @@ If you don't have `make` installed in your system, you can use bash directly wit
 | ------------------------------ | ---------- |
 | Bash                           | `5.3.15`   |
 | GNU Make                       | `4.4.1`    |
-| Go                             | `1.26.6`   |
+| Go                             | `1.27.1`   |
 | Docker Engine                  | `29.8.1`   |
 | Docker Buildx                  | `v0.37.1`  |
 | Kind                           | `v0.33.0`  |
 | Kubernetes node                | `v1.37.0`  |
-| kubectl                        | `v1.37.0`  |
-| Pulumi CLI                     | `3.264.0`  |
+| kubectl                        | `v1.37.1`  |
+| Pulumi CLI                     | `3.265.0`  |
 | Pulumi Go SDK                  | `v3.265.0` |
 | Pulumi Kubernetes SDK/provider | `v4.34.2`  |
 | Git                            | `2.55.0`   |
 | curl                           | `8.21.0`   |
 | jq                             | `1.8.2`    |
 
-**Note**: The Kubernetes node image is pinned to: `kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5`
+**Note**: The Kubernetes node image is pinned to: `kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5`. Kind `v0.33.0` does not publish a `v1.37.1` node image, so the node stays on `v1.37.0` while `kubectl v1.37.1` remains within the supported one-minor version skew.
 
 **Note**: Kind must be able to use Docker as the current user. If the script reports permission denied for `/var/run/docker.sock`, configure non-root Docker access and start a new login session before continuing. Avoid mixing `sudo docker` with non-sudo Kind and kubectl commands because that can create resources and configuration under different users.
 
