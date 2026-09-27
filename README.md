@@ -120,7 +120,7 @@ The image uses `imagePullPolicy: Never` because it is copied directly into Kind 
 - `go test -race` checks application code for data races;
 - GitHub Actions deploys the image to a real Kind cluster (which is ephemeral by design) and validates the response contract through `kubectl port-forward`, which resolves the Service to a Pod.
 
-Pull requests run a Pulumi preview. Pushes to `main` apply the infrastructure to the ephemeral Kind cluster and run the smoke test.
+CI runs on pushes to `main` and when pull requests targeting `main` are opened, updated, or reopened. Each run tests, builds, and loads the image into Kind. Pull requests run a Pulumi preview; pushes to `main` deploy and smoke-test the application.
 
 ## Deliberate tradeoffs
 

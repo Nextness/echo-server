@@ -339,17 +339,19 @@ The endpoint remains available while the Service and Kind cluster are running. U
 
 ## GitHub Actions
 
-The workflow creates a new Kind cluster and local Pulumi backend for each job:
+Every workflow run executes `scripts/ci.sh` to run tests, build the image, and load it into a new Kind cluster. Pulumi uses a local backend for that run. The trigger determines the remaining steps:
 
-- Pull requests run tests, build and load the image, and execute `pulumi preview`.
+- Opening, updating, or reopening a pull request targeting `main` runs `pulumi preview`.
 - Pushes to `main` run `pulumi up`, wait for the Deployment, and validate the response contract.
 - Manual runs can select either `preview` or `apply`.
+
+Pushing to a feature branch triggers CI only when it updates an open pull request targeting `main`. The workflow does not run automatically on every branch push.
 
 The CI environment and deployed service disappear when the runner is destroyed; this workflow is deployment validation, not a persistent environment.
 
 ### Passphrase in CI
 
-The workflow sets `PULUMI_CONFIG_PASSPHRASE` to the documented exercise passphrase directly instead of using a repository secret. The stack contains no encrypted values and the value is already public, so there is nothing to protect. This also means fresh repository copies and pull requests from forks can run the Pulumi preview and apply steps without any repository configuration.
+The workflow sets `PULUMI_CONFIG_PASSPHRASE` to the documented exercise passphrase directly instead of using a repository secret. The stack contains no encrypted values and the value is already public, so there is nothing to protect. No repository secret configuration is required, including for previews of pull requests from forks.
 
 ## Troubleshooting
 
