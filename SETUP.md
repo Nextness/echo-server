@@ -152,7 +152,7 @@ The backend is ignored by Git and does not require a Pulumi Cloud account.
 
 ### Passphrase
 
-Pulumi's local passphrase protects encrypted stack configuration. For this exercise, the committed local stack configuration was generated with the shared passphrase `local-ci-only` so that local development and ephemeral CI can use the same configuration. Enter it when Pulumi prompts for the passphrase.
+Pulumi's local passphrase protects encrypted stack configuration. For this exercise, the committed local stack configuration was generated with the shared passphrase `local-ci-only` so that local development and ephemeral CI can use the same configuration. Enter it when Pulumi prompts for the passphrase. The GitHub Actions workflow sets the same value directly as an environment variable, so no repository secret is required.
 
 The committed `encryptionsalt` in `infra/Pulumi.local.yaml` is not itself a password. Do not delete or edit it to rotate the passphrase for an existing stack. A production repository should use a unique, undisclosed passphrase and a supported Pulumi secrets-provider migration process.
 
@@ -347,19 +347,9 @@ The workflow creates a new Kind cluster and local Pulumi backend for each job:
 
 The CI environment and deployed service disappear when the runner is destroyed; this workflow is deployment validation, not a persistent environment.
 
-### Required repository secret
+### Passphrase in CI
 
-Create a repository Actions secret named `PULUMI_CONFIG_PASSPHRASE`. Its value must be the exercise passphrase documented above because it was used to generate the encryption salt in `infra/Pulumi.local.yaml`.
-
-Set it interactively with the GitHub CLI:
-
-```bash
-gh secret set PULUMI_CONFIG_PASSPHRASE
-```
-
-Alternatively, use **Repository Settings → Secrets and variables → Actions → New repository secret**.
-
-The workflow receives the passphrase through the GitHub secret rather than hardcoding it in the workflow or stack configuration. GitHub does not expose repository secrets to workflows triggered by pull requests from forks, so Pulumi preview cannot run for an untrusted fork with this workflow design.
+The workflow sets `PULUMI_CONFIG_PASSPHRASE` to the documented exercise passphrase directly instead of using a repository secret. The stack contains no encrypted values and the value is already public, so there is nothing to protect. This also means fresh repository copies and pull requests from forks can run the Pulumi preview and apply steps without any repository configuration.
 
 ## Troubleshooting
 
@@ -396,7 +386,7 @@ pulumi login "file://${PWD}/.pulumi-state"
 
 ### Pulumi reports `incorrect passphrase`
 
-The supplied `PULUMI_CONFIG_PASSPHRASE`, or the value entered at the prompt, does not match the encryption salt in the selected stack configuration. Use the shared exercise passphrase documented in the Passphrase section. Do not replace the GitHub secret or edit `encryptionsalt` without deliberately migrating the stack's secrets provider.
+The supplied `PULUMI_CONFIG_PASSPHRASE`, or the value entered at the prompt, does not match the encryption salt in the selected stack configuration. Use the shared exercise passphrase documented in the Passphrase section. Do not edit `encryptionsalt` without deliberately migrating the stack's secrets provider.
 
 ### Pod reports `ErrImageNeverPull`
 
