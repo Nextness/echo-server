@@ -225,7 +225,7 @@ The expected configuration is:
 
 ## 6. Access and test the service
 
-The default Service is intentionally private to the cluster. In a dedicated terminal, forward local port `8080` to Service port `80`:
+The default Service is intentionally private to the cluster. In a dedicated terminal, use `kubectl port-forward` to resolve the Service to one of its Pods and tunnel local port `8080` directly to that Pod:
 
 ```bash
 kubectl --context kind-echo port-forward \
@@ -261,7 +261,7 @@ The response should contain these values, in addition to automatically supplied 
 }
 ```
 
-This request travels through the local port-forward, ClusterIP Service, and Deployment Pod. It therefore verifies more than a standalone handler or container test.
+This request travels through the local port-forward and directly to a Deployment Pod that the Service selected. It verifies the deployed Pod, the handler, and that the Service resolves to a ready endpoint, but it does not exercise ClusterIP routing or Service load balancing. Testing those would require an in-cluster client or the optional `NodePort` path below.
 
 If port `8080` is already occupied, change only the host side of the mapping:
 
@@ -333,7 +333,7 @@ node_ip="$(
 curl --fail-with-body "http://${node_ip}:30080/demo?tag=go&tag=kind" | jq
 ```
 
-The endpoint remains available while the Service and Kind cluster are running. This relies on the Linux host being able to route to the Docker bridge address used by the Kind node. Environments that cannot reach that address should continue using port forwarding. Binding specifically to `127.0.0.1` would still require a Kind host-port mapping outside the current Pulumi-managed Kubernetes resources. A real cloud environment would normally use an Ingress or `LoadBalancer` Service instead of this local NodePort arrangement.
+The endpoint remains available while the Service and Kind cluster are running. Unlike port forwarding, this path enters through the node and is routed by kube-proxy to the Service's ClusterIP, so it does exercise ClusterIP routing. This relies on the Linux host being able to route to the Docker bridge address used by the Kind node. Environments that cannot reach that address should continue using port forwarding. Binding specifically to `127.0.0.1` would still require a Kind host-port mapping outside the current Pulumi-managed Kubernetes resources. A real cloud environment would normally use an Ingress or `LoadBalancer` Service instead of this local NodePort arrangement.
 
 **Note**: This is a local-development convenience rather than the recommended approach. It avoids keeping a port-forward process running, but requires resolving the Kind node IP and **only works** when the host can route to the Docker bridge network.
 
@@ -531,7 +531,7 @@ To automate the complete local workflow after installing the prerequisites, run:
 make test-e2e
 ```
 
-The script creates or reuses the `echo` Kind cluster, builds and loads the application image under a unique tag (for example, `echo-server:e2e-20260926213000`), configures Pulumi with that exact reference, deploys it, and validates the response contract through the Kubernetes Service. It also checks that the Deployment references the built tag and restores the previous Pulumi image configuration when it finishes, so rebuilding the same tag cannot make the smoke test pass against a stale Pod.
+The script creates or reuses the `echo` Kind cluster, builds and loads the application image under a unique tag (for example, `echo-server:e2e-20260926213000`), configures Pulumi with that exact reference, deploys it, and validates the response contract through `kubectl port-forward` to a Pod selected by the Service. It also checks that the Deployment references the built tag and restores the previous Pulumi image configuration when it finishes, so rebuilding the same tag cannot make the smoke test pass against a stale Pod.
 
 Remove the project environment with:
 
