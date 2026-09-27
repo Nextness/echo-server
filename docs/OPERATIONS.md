@@ -1,5 +1,7 @@
 # Ongoing operations
 
+Run commands from the repository root with the local environment already deployed.
+
 ## Updating the local image
 
 Rebuilding the same `echo-server:local` tag does not change the Deployment specification, so an existing Pod may continue running the previous image. The clearest local iteration workflow is to use a new tag:
@@ -13,12 +15,17 @@ pulumi -C infra up --yes --stack local
 kubectl --context kind-echo rollout status deployment/echo-server --timeout=120s
 ```
 
-To return to the default tag:
+To return to the default tag, build and load it before updating Pulumi. This also works when the environment was created with `make test-e2e`, which only loads a uniquely tagged E2E image:
 
 ```bash
+docker buildx build --load --tag echo-server:local .
+kind load docker-image echo-server:local --name echo
 pulumi -C infra config set image echo-server:local --stack local
 pulumi -C infra up --yes --stack local
+kubectl --context kind-echo rollout status deployment/echo-server --timeout=120s
 ```
+
+If the Deployment already uses `echo-server:local`, follow the [restart instructions](./TROUBLESHOOTING.md#pulumi-reports-no-changes-after-rebuilding) after rebuilding and loading it.
 
 ## GitHub Actions
 
@@ -34,4 +41,4 @@ The CI environment and deployed service disappear when the runner is destroyed; 
 
 ## Passphrase in CI
 
-The workflow sets `PULUMI_CONFIG_PASSPHRASE` to the documented exercise passphrase directly instead of using a repository secret. The stack contains no encrypted values and the value is already public, so there is nothing to protect. No repository secret configuration is required, including for previews of pull requests from forks.
+The workflow sets `PULUMI_CONFIG_PASSPHRASE` to the [documented exercise passphrase](../SETUP.md#passphrase) directly instead of using a repository secret. The stack contains no encrypted values and the value is already public, so there is nothing to protect. No repository secret configuration is required, including for previews of pull requests from forks.

@@ -4,6 +4,8 @@ This document describes the setup required to run the project locally.
 
 Run commands from the repository root unless a section says otherwise.
 
+Related documents: [Operations](./docs/OPERATIONS.md), [Cleanup](./docs/CLEANUP.md), and [Troubleshooting](./docs/TROUBLESHOOTING.md).
+
 ## Prerequisites
 
 The following table lists the versions used to run the project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`.
@@ -274,7 +276,7 @@ The response should contain these values, in addition to automatically supplied 
 }
 ```
 
-This request travels through the local port-forward and directly to a Deployment Pod that the Service selected. It verifies the deployed Pod, the handler, and that the Service resolves to a ready endpoint, but it does not exercise ClusterIP routing or Service load balancing. Testing those would require an in-cluster client or the optional `NodePort` path below.
+This request travels through the local port-forward and directly to a Deployment Pod that the Service selected. It verifies the deployed Pod, the handler, and that the Service resolves to a ready endpoint, but it does not exercise ClusterIP routing or Service load balancing. Testing those would require an in-cluster client.
 
 If port `8080` is already occupied, change only the host side of the mapping:
 
@@ -292,8 +294,10 @@ To automate the complete local workflow after installing the prerequisites, run:
 make test-e2e
 ```
 
-Remove the project environment with:
+After using this automated workflow, remove the project environment with:
 
 ```bash
 make test-e2e E2E_ARGS=--delete
 ```
+
+This also restores the image setting saved before the first E2E run. Use this command instead of manual teardown after running E2E; see [Cleanup](./docs/CLEANUP.md) for details and deletion scope.

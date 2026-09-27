@@ -85,7 +85,12 @@ make run-infra          # applies the infrastructure; requires the Kind cluster 
 make clean              # deletes build/
 ```
 
-For more details on how to properly set up and run this project, read [SETUP.md](./SETUP.md).
+Documentation:
+
+- [Setup](./SETUP.md): prerequisites, deployment, and end-to-end automation.
+- [Operations](./docs/OPERATIONS.md): updating images and CI behavior.
+- [Cleanup](./docs/CLEANUP.md): teardown for automated and manual setups.
+- [Troubleshooting](./docs/TROUBLESHOOTING.md): common errors and recovery steps.
 
 ## Container and Kubernetes safeguards
 

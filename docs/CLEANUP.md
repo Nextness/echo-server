@@ -1,10 +1,22 @@
 # Destruction and cleanup
 
-This step is optional and can be skipped.
+Cleanup is optional. Run commands from the repository root.
 
-## Graceful teardown
+## After using the automated E2E workflow
 
-Reverse the setup order so Pulumi can delete Kubernetes resources while the cluster is still reachable.
+If you have run `make test-e2e`, stop any active `kubectl port-forward` and use this command instead of the manual teardown below:
+
+```bash
+make test-e2e E2E_ARGS=--delete
+```
+
+It destroys the deployed resources, restores the image setting saved before the first E2E run without replacing other stack configuration, and removes the Pulumi stack, local backend, `echo` Kind cluster, and host Docker tags matching `echo-server:*`.
+
+Do not manually remove the stack or `.pulumi-state` first: the automated cleanup needs the stack and `.pulumi-state/previous-image` to restore the saved image setting. Manual teardown would leave the E2E tag configured even though its image is no longer available in Kind.
+
+## Graceful teardown for manual setup
+
+For an environment created using the manual steps in [SETUP.md](../SETUP.md), reverse the setup order so Pulumi can delete Kubernetes resources while the cluster is still reachable.
 
 First, stop the active `kubectl port-forward` with `Ctrl+C`. Then destroy the Deployment and Service:
 
@@ -19,6 +31,14 @@ Confirm that the application resources are gone:
 ```bash
 kubectl --context kind-echo get deployment,service,pod
 ```
+
+If you changed the image tag during manual development and plan to repeat the default setup, reset only the image setting before removing the stack:
+
+```bash
+pulumi -C infra config set image echo-server:local --stack local
+```
+
+If you want to retain a custom tag instead, build and load that exact tag during the next setup.
 
 Remove the Pulumi stack record and backups while preserving the tracked `infra/Pulumi.local.yaml` configuration:
 
