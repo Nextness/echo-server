@@ -6,48 +6,33 @@ Run commands from the repository root unless a section says otherwise.
 
 ## Prerequisites
 
-Install these tools before starting:
-
-- Go
-- Docker Engine
-- Docker Buildx plugin
-- Kind
-- kubectl
-- Pulumi CLI
-- GNU Make, Git, Bash, curl, and jq
-
-**Note**: The shell script uses Bash features such as arrays and `mapfile`. On Windows, use WSL2 rather than attempting to run it from Command Prompt or PowerShell.
-
-### Tested versions
-
-The following table lists the versions used to run the complete project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`.
+The following table lists the versions used to run the project. If you are unsure whether your dependencies meet the requirements, run `make check-requirements`.
 
 `make check-requirements` prints every missing, outdated, or unusable requirement and warns when the project may not work as intended. It always exits successfully, so review its output before continuing.
 
 If you don't have `make` installed in your system, you can use bash directly with the following command `bash scripts/check-requirements.sh`.
 
-| Component                      | User Version |
-| ------------------------------ | ------------ |
-| Bash                           | `5.3.15`     |
-| GNU Make                       | `4.4.1`      |
-| Go                             | `1.27.1`     |
-| Docker Engine                  | `29.8.1`     |
-| Docker Buildx                  | `v0.37.1`    |
-| Kind                           | `v0.33.0`    |
-| Kubernetes node                | `v1.37.0`    |
-| kubectl                        | `v1.37.1`    |
-| Pulumi CLI                     | `3.265.0`    |
-| Pulumi Go SDK                  | `v3.265.0`   |
-| Pulumi Kubernetes SDK/provider | `v4.34.2`    |
-| Git                            | `2.55.0`     |
-| curl                           | `8.21.0`     |
-| jq                             | `1.8.2`    |
+| Component                      | Validated Version |
+| :----------------------------- | :---------------- |
+| Bash                           | `5.3.15`          |
+| GNU Make                       | `4.4.1`           |
+| Go                             | `1.27.1`          |
+| Docker Engine                  | `29.8.1`          |
+| Docker Buildx                  | `v0.37.1`         |
+| Kind                           | `v0.33.0`         |
+| Kubernetes node                | `v1.37.0`         |
+| kubectl                        | `v1.37.1`         |
+| Pulumi CLI                     | `3.265.0`         |
+| Pulumi Go SDK                  | `v3.265.0`        |
+| Pulumi Kubernetes SDK/provider | `v4.34.2`         |
+| Git                            | `2.55.0`          |
+| curl                           | `8.21.0`          |
+| jq                             | `1.8.2`           |
 
-**Note**: The Kubernetes node image is pinned to: `kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5`. Kind `v0.33.0` does not publish a `v1.37.1` node image, so the node stays on `v1.37.0` while `kubectl v1.37.1` remains within the supported one-minor version skew.
-
-**Note**: Kind must be able to use Docker as the current user. If the script reports permission denied for `/var/run/docker.sock`, configure non-root Docker access and start a new login session before continuing.
-
-**Note**: Avoid mixing `sudo docker` with non-sudo Kind and kubectl commands because that can create resources and configuration under different users.
+> [!NOTE]
+> - The Kubernetes node image is pinned to: `kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5`. Kind `v0.33.0` does not publish a `v1.37.1` node image, so the node stays on `v1.37.0` while `kubectl v1.37.1` remains within the supported one-minor version skew.
+> - Kind must be able to use Docker as the current user. If the script reports permission denied for `/var/run/docker.sock`, configure non-root Docker access and start a new login session before continuing.
+> - Avoid mixing `sudo docker` with non-sudo Kind and kubectl commands because that can create resources and configuration under different users.
 
 <details>
 
