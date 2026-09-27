@@ -341,8 +341,8 @@ The endpoint remains available while the Service and Kind cluster are running. U
 
 The workflow creates a new Kind cluster and local Pulumi backend for each job:
 
-- Every push runs tests, builds and loads the image, and, on `main`, executes `pulumi up`, waits for the Deployment, and validates the response contract.
 - Pull requests run tests, build and load the image, and execute `pulumi preview`.
+- Pushes to `main` run `pulumi up`, wait for the Deployment, and validate the response contract.
 - Manual runs can select either `preview` or `apply`.
 
 The CI environment and deployed service disappear when the runner is destroyed; this workflow is deployment validation, not a persistent environment.
