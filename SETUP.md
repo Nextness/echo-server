@@ -194,7 +194,7 @@ The Make target reruns the prerequisite check and then executes `pulumi -C infra
 
 ## 5. Verify the deployment
 
-Wait for the Deployment rollout and Pod readiness:
+Wait for the Deployment rollout and availability:
 
 ```bash
 kubectl --context kind-echo rollout status \
@@ -202,8 +202,8 @@ kubectl --context kind-echo rollout status \
   --timeout=120s
 
 kubectl --context kind-echo wait \
-  --for=condition=Ready pod \
-  --selector app.kubernetes.io/name=echo-server \
+  --for=condition=Available \
+  deployment/echo-server \
   --timeout=120s
 ```
 
@@ -541,7 +541,7 @@ To automate the complete local workflow after installing the prerequisites, run:
 make test-e2e
 ```
 
-The script creates or reuses the `echo` Kind cluster, builds and loads the application image, deploys it with Pulumi, and validates the response contract through the Kubernetes Service.
+The script creates or reuses the `echo` Kind cluster, builds and loads the application image under a unique tag (for example, `echo-server:e2e-20260926213000`), configures Pulumi with that exact reference, deploys it, and validates the response contract through the Kubernetes Service. It also checks that the Deployment references the built tag and restores the previous Pulumi image configuration when it finishes, so rebuilding the same tag cannot make the smoke test pass against a stale Pod.
 
 Remove the project environment with:
 
