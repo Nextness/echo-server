@@ -1,4 +1,4 @@
-# Local setup and operations
+# Local setup
 
 This document describes the setup required to run the project locally.
 
@@ -286,7 +286,7 @@ kubectl --context kind-echo port-forward service/echo-server 18080:80
 
 Then send the request to `http://127.0.0.1:18080`.
 
-# End to end Automation
+## End-to-end automation
 
 To automate the complete local workflow after installing the prerequisites, run:
 

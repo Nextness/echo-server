@@ -2,7 +2,7 @@
 
 This repository contains a small Echo Server written in Go. It accepts requests on any path and returns the request headers, query parameters, raw body, and path as JSON.
 
-The application is packaged as a minimal non-root container and deployed to a local Kind Kubernetes cluster with Pulumi. CI creates an ephemeral cluster for smoke tests.
+The application is packaged as a minimal non-root container and deployed to a local Kind Kubernetes cluster with Pulumi. CI creates an ephemeral cluster per run; pushes to `main` deploy and smoke-test it.
 
 ## Architecture
 
@@ -29,7 +29,8 @@ Repository structure:
 - `cmd/echo/main.go`: composes the handler, HTTP server, signals, and graceful shutdown;
 - `infra`: declares the Kubernetes Deployment and Service with Pulumi;
 - `scripts/`: contains scripts relevant to the project;
-- GitHub Actions creates an ephemeral Kind cluster and verifies the deployed service end to end.
+- `docs/`: operations, cleanup, and troubleshooting guides;
+- GitHub Actions creates an ephemeral Kind cluster per run and verifies the deployed service end to end on pushes to `main`.
 
 ## Response contract
 
@@ -77,15 +78,18 @@ Every normal request path is handled. A successful request returns `200 OK` and 
 ```bash
 make help               # list all available Make commands
 make check-requirements # report missing or outdated prerequisites (does not fail)
-make test               # runs all formatting checks, vet checks, race-enabled unit tests, and Pulumi tests
-make test-e2e           # deploys locally and validates the response through kubectl port-forward, optionally add E2E_ARGS=--delete
-                        #   to delete the resources created in the e2e test
+make test               # runs all formatting checks, vet checks, race-enabled unit
+                        #   tests, and Pulumi tests
+make test-e2e           # deploys locally and validates the response through
+                        #   kubectl port-forward, optionally add E2E_ARGS=--delete
+                        #   to delete the resources created in the E2E test
 make build-echo-server  # builds a local executable at build/echo-server
-make run-infra          # applies the infrastructure; requires the Kind cluster described in SETUP.md
+make run-infra          # applies the infrastructure; requires the Kind cluster
+                        #   described in SETUP.md
 make clean              # deletes build/
 ```
 
-Documentation:
+## Documentation
 
 - [Setup](./SETUP.md): prerequisites, deployment, and end-to-end automation.
 - [Operations](./docs/OPERATIONS.md): updating images and CI behavior.
@@ -118,12 +122,13 @@ The image uses `imagePullPolicy: Never` because it is copied directly into Kind 
 
 ## Testing strategy
 
-- Handler tests cover methods, paths, raw and Unicode bodies, repeated headers and query parameters, body limits, read errors, HEAD semantics, and concurrent requests;
+- Handler tests cover methods, paths, raw and Unicode bodies (including invalid UTF-8 replacement), repeated headers and query parameters, body limits, read errors, HEAD semantics, and concurrent requests;
 - Configuration tests cover defaults, custom values, boundaries, and invalid values;
-- Server tests cover invalid configuration, listener errors, and graceful cancellation;
+- Server tests cover invalid configuration, listener errors, graceful cancellation, and `OPTIONS *`;
 - Pulumi mock tests validate configuration, labels, image settings, ports, probes, security settings, and the Service contract;
+- A unit test covers the exported port-forward command's Kubernetes context;
 - `go test -race` checks application code for data races;
-- GitHub Actions deploys the image to a real Kind cluster (which is ephemeral by design) and validates the response contract through `kubectl port-forward`, which resolves the Service to a Pod.
+- On pushes to `main`, GitHub Actions deploys the image to a real Kind cluster (which is ephemeral by design) and validates the response contract through `kubectl port-forward`, which resolves the Service to a Pod.
 
 CI runs on pushes to `main` and when pull requests targeting `main` are opened, updated, or reopened. Each run tests, builds, and loads the image into Kind. Pull requests run a Pulumi preview; pushes to `main` deploy and smoke-test the application.
 
